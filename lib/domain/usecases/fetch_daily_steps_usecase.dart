@@ -31,19 +31,17 @@ class FetchDailyStepsUseCase {
       dayToItem[_key(d.localDay)] = d;
     }
 
-    // Fill gaps with 0 to keep continuity
-    DateTime cursor = DateTime(from.year, from.month, from.day);
-    final end = DateTime(to.year, to.month, to.day);
-    while (!cursor.isAfter(end)) {
-      final key = _key(cursor);
-      dayToItem[key] =
-          dayToItem[key] ??
-          DailySteps(
-            localDay: cursor,
-            steps: 0,
-            tzOffsetMinutes: cursor.timeZoneOffset.inMinutes,
-          );
-      cursor = cursor.add(const Duration(days: 1));
+    // 确保至少包含今日数据，但不填充历史0值数据
+    final today = DateTime.now();
+    final todayKey = _key(today);
+
+    // 如果没有今日数据，创建一个今日记录（步数为0，但至少显示）
+    if (!dayToItem.containsKey(todayKey)) {
+      dayToItem[todayKey] = DailySteps(
+        localDay: DateTime(today.year, today.month, today.day),
+        steps: 0,
+        tzOffsetMinutes: today.timeZoneOffset.inMinutes,
+      );
     }
 
     final result = dayToItem.values.toList()

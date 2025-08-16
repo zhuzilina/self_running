@@ -161,7 +161,38 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
 
   Future<void> _loadStepsData() async {
     try {
-      // 首先尝试从用户每日数据获取步数
+      // 使用与主页相同的方式获取步数数据
+      final stepsDataAsync = ref.read(dailyStepsProvider);
+
+      stepsDataAsync.when(
+        data: (stepsData) async {
+          if (mounted && stepsData.isNotEmpty) {
+            final steps = stepsData.last.steps; // 获取最新的步数数据
+            setState(() {
+              _cachedSteps = steps;
+            });
+
+            // 同时更新用户每日数据，保持数据一致性
+            await ref.read(userDailyDataServiceProvider).updateSteps(steps);
+          }
+        },
+        loading: () {
+          // 正在加载时不做任何操作
+        },
+        error: (error, stack) {
+          print('Error loading steps data in diary page: $error');
+          // 如果获取失败，尝试从用户每日数据获取缓存值
+          _loadCachedStepsData();
+        },
+      );
+    } catch (e) {
+      print('Error loading steps data in diary page: $e');
+      _loadCachedStepsData();
+    }
+  }
+
+  Future<void> _loadCachedStepsData() async {
+    try {
       final userData = await ref
           .read(userDailyDataServiceProvider)
           .getTodayUserData();
@@ -169,25 +200,9 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
         setState(() {
           _cachedSteps = userData.steps;
         });
-        return;
-      }
-
-      // 如果用户数据不存在，则从健康数据获取
-      final stepsData = await ref
-          .read(fetchDailyStepsUseCaseProvider)
-          .call(from: DateTime.now(), to: DateTime.now());
-
-      if (mounted && stepsData.isNotEmpty) {
-        final steps = stepsData.first.steps;
-        setState(() {
-          _cachedSteps = steps;
-        });
-
-        // 保存到用户每日数据
-        await ref.read(userDailyDataServiceProvider).updateSteps(steps);
       }
     } catch (e) {
-      // 忽略错误，使用默认值
+      print('Error loading cached steps data: $e');
     }
   }
 

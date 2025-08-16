@@ -1,4 +1,5 @@
 import 'package:health/health.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class HealthPermissionService {
   static final HealthPermissionService _instance =
@@ -13,12 +14,15 @@ class HealthPermissionService {
     try {
       final types = [
         HealthDataType.STEPS,
-        HealthDataType.DISTANCE_WALKING_RUNNING,
         HealthDataType.ACTIVE_ENERGY_BURNED,
         HealthDataType.HEART_RATE,
       ];
 
-      final permissions = [HealthDataAccess.READ];
+      final permissions = [
+        HealthDataAccess.READ,
+        HealthDataAccess.READ,
+        HealthDataAccess.READ,
+      ];
 
       final granted = await _health.requestAuthorization(
         types,
@@ -36,14 +40,21 @@ class HealthPermissionService {
   /// 请求健康数据权限
   Future<bool> requestPermissions() async {
     try {
+      // 首先请求活动识别和位置权限
+      await Permission.activityRecognition.request();
+      await Permission.location.request();
+
       final types = [
         HealthDataType.STEPS,
-        HealthDataType.DISTANCE_WALKING_RUNNING,
         HealthDataType.ACTIVE_ENERGY_BURNED,
         HealthDataType.HEART_RATE,
       ];
 
-      final permissions = [HealthDataAccess.READ];
+      final permissions = [
+        HealthDataAccess.READ,
+        HealthDataAccess.READ,
+        HealthDataAccess.READ,
+      ];
 
       final granted = await _health.requestAuthorization(
         types,
@@ -70,5 +81,3 @@ class HealthPermissionService {
     }
   }
 }
-
-

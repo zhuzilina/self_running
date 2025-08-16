@@ -7,11 +7,14 @@ class HealthRepository {
   Future<bool> requestPermissions() async {
     final types = [
       HealthDataType.STEPS,
-      HealthDataType.DISTANCE_WALKING_RUNNING,
       HealthDataType.ACTIVE_ENERGY_BURNED,
       HealthDataType.HEART_RATE,
     ];
-    final permissions = [HealthDataAccess.READ];
+    final permissions = [
+      HealthDataAccess.READ,
+      HealthDataAccess.READ,
+      HealthDataAccess.READ,
+    ];
     try {
       final granted = await _health.requestAuthorization(
         types,

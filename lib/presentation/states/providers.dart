@@ -80,7 +80,8 @@ final dailyStepsProvider = FutureProvider<List<DailySteps>>((ref) async {
     await storage.init();
     final usecase = ref.read(fetchDailyStepsUseCaseProvider);
     final now = DateTime.now();
-    final from = now.subtract(const Duration(days: 120));
+    // 获取最近30天的数据
+    final from = now.subtract(const Duration(days: 30));
     final to = now;
     return await usecase.call(from: from, to: to);
   } catch (e, stackTrace) {
