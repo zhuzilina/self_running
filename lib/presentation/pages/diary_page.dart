@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:crypto/crypto.dart';
 import '../states/providers.dart';
 import '../../data/models/audio_file.dart';
 
@@ -41,6 +43,10 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
   Timer? _recordingTimer; // 添加录音计时器
   Duration _currentRecordingDuration = Duration.zero; // 当前录音时长
   int? _cachedSteps; // 缓存步数数据
+
+  // 用于检测修改的变量
+  String? _initialStateHash; // 初始状态的MD5哈希值
+  bool _hasUnsavedChanges = false; // 是否有未保存的修改
 
   @override
   void initState() {
@@ -107,16 +113,16 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
           _playTimers.add(null);
         }
 
-        // TODO: 加载已保存的图片
-        // 这里需要从文件系统加载图片数据到 _selectedImages
+        // 加载已保存的图片
         _loadSavedImages(diary.imagePaths);
-      }
-    });
-
-    // 确保文本框不会自动获得焦点
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _textFocusNode.unfocus();
+      } else {
+        // 如果没有日记，也要生成初始状态哈希值
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _textFocusNode.unfocus();
+            _initialStateHash = _generateStateHash();
+          }
+        });
       }
     });
   }
@@ -132,8 +138,24 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
         }
       }
       setState(() {});
+
+      // 图片加载完成后，生成初始状态哈希值
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _textFocusNode.unfocus();
+          _initialStateHash = _generateStateHash();
+        }
+      });
     } catch (e) {
       print('加载已保存图片失败: $e');
+
+      // 即使加载失败，也要生成初始状态哈希值
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _textFocusNode.unfocus();
+          _initialStateHash = _generateStateHash();
+        }
+      });
     }
   }
 
@@ -525,7 +547,7 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
     }
   }
 
-  Future<void> _saveDiary() async {
+  Future<bool> _saveDiary({bool autoReturn = true}) async {
     setState(() => _isLoading = true);
 
     try {
@@ -598,17 +620,26 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
           const SnackBar(content: Text('保存成功'), duration: Duration(seconds: 1)),
         );
 
+        // 保存成功后重置初始状态哈希值
+        _resetInitialStateHash();
+
         // 刷新今日日记数据
         ref.invalidate(todayDiaryProvider);
 
-        Navigator.of(context).pop();
+        // 根据参数决定是否自动返回
+        if (autoReturn) {
+          Navigator.of(context).pop();
+        }
       }
+
+      return true; // 保存成功
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('保存失败：$e')));
       }
+      return false; // 保存失败
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -756,7 +787,37 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
               ],
             ),
           ),
-          if (_audioPaths.length < maxAudios)
+          // 先显示录音文件列表
+          if (_audioPaths.isNotEmpty)
+            Column(
+              children: _audioPaths.asMap().entries.map((entry) {
+                final index = entry.key;
+                return _AudioListItem(
+                  index: index,
+                  audioName: _audioNames[index],
+                  recordTime: _audioRecordTimes[index],
+                  duration: _audioDurations[index],
+                  isPlaying: _isPlaying[index],
+                  currentPosition: _currentPlayPositions[index],
+                  onPlay: () => _playAudio(index),
+                  onDelete: () => _removeAudio(index),
+                  onNameChanged: (newName) {
+                    setState(() {
+                      _audioNames[index] = newName;
+                    });
+                  },
+                  onEditingStarted: () {
+                    // 编辑开始
+                  },
+                  onEditingFinished: () {
+                    // 编辑结束
+                  },
+                );
+              }).toList(),
+            ),
+          // 录音按钮放在录音文件列表下面
+          if (_audioPaths.length < maxAudios) ...[
+            const SizedBox(height: 16),
             GestureDetector(
               onTapDown: (_) => _startRecording(),
               onTapUp: (_) => _stopRecording(),
@@ -796,34 +857,7 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
                 ),
               ),
             ),
-          const SizedBox(height: 16),
-          if (_audioPaths.isNotEmpty)
-            Column(
-              children: _audioPaths.asMap().entries.map((entry) {
-                final index = entry.key;
-                return _AudioListItem(
-                  index: index,
-                  audioName: _audioNames[index],
-                  recordTime: _audioRecordTimes[index],
-                  duration: _audioDurations[index],
-                  isPlaying: _isPlaying[index],
-                  currentPosition: _currentPlayPositions[index],
-                  onPlay: () => _playAudio(index),
-                  onDelete: () => _removeAudio(index),
-                  onNameChanged: (newName) {
-                    setState(() {
-                      _audioNames[index] = newName;
-                    });
-                  },
-                  onEditingStarted: () {
-                    // 编辑开始
-                  },
-                  onEditingFinished: () {
-                    // 编辑结束
-                  },
-                );
-              }).toList(),
-            ),
+          ],
         ],
       ),
     );
@@ -847,7 +881,7 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _handleBackPress,
         ),
         actions: [
           if (_isLoading)
@@ -876,94 +910,230 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
             ),
         ],
       ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _getFormattedDate(),
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
+      body: WillPopScope(
+        onWillPop: () async {
+          await _handleBackPress();
+          return false; // 我们已经在_handleBackPress中处理了导航
+        },
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _getFormattedDate(),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                      Text(
-                        _formatSteps(_cachedSteps ?? 0),
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w500,
+                        Text(
+                          _formatSteps(_cachedSteps ?? 0),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                Container(height: 1, color: Colors.grey.shade200),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: _textController,
-                  focusNode: _textFocusNode, // 使用焦点节点
-                  cursorColor: Colors.grey,
-                  decoration: const InputDecoration(
-                    hintText: '记录今天的心情、想法或发生的事情...',
-                    hintStyle: TextStyle(
-                      color: Colors.grey,
+                  Container(height: 1, color: Colors.grey.shade200),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: _textController,
+                    focusNode: _textFocusNode, // 使用焦点节点
+                    cursorColor: Colors.grey,
+                    decoration: const InputDecoration(
+                      hintText: '记录今天的心情、想法或发生的事情...',
+                      hintStyle: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 16,
+                        height: 1.6,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    style: const TextStyle(
                       fontSize: 16,
                       height: 1.6,
+                      color: Colors.black87,
                     ),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                    contentPadding: EdgeInsets.zero,
+                    maxLines: null,
+                    textAlignVertical: TextAlignVertical.top,
+                    keyboardType: TextInputType.multiline,
+                    textCapitalization: TextCapitalization.sentences,
+                    enableInteractiveSelection: true, // 启用交互选择
+                    onTap: () {
+                      // 主文本编辑框点击
+                      _textFocusNode.requestFocus();
+                    },
                   ),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    height: 1.6,
-                    color: Colors.black87,
-                  ),
-                  maxLines: null,
-                  textAlignVertical: TextAlignVertical.top,
-                  keyboardType: TextInputType.multiline,
-                  textCapitalization: TextCapitalization.sentences,
-                  enableInteractiveSelection: true, // 启用交互选择
-                  onTap: () {
-                    // 主文本编辑框点击
-                    _textFocusNode.requestFocus();
-                  },
-                ),
-                const SizedBox(height: 32),
-                _buildImageGrid(),
-                const SizedBox(height: 32),
-                _buildAudioSection(),
-                const SizedBox(height: 100),
-              ],
-            ),
-          ),
-          // 录音指示器覆盖层
-          if (_showRecordingIndicator)
-            Positioned(
-              right: 0,
-              left: 0,
-              top: MediaQuery.of(context).size.height * 0.1,
-              child: Container(
-                color: Colors.black.withOpacity(0.7),
-                child: Center(child: _buildRecordingIndicator()),
+                  const SizedBox(height: 32),
+                  _buildImageGrid(),
+                  const SizedBox(height: 32),
+                  _buildAudioSection(),
+                  const SizedBox(height: 100),
+                ],
               ),
             ),
-        ],
+            // 录音指示器覆盖层
+            if (_showRecordingIndicator)
+              Positioned(
+                right: 0,
+                left: 0,
+                top: MediaQuery.of(context).size.height * 0.1,
+                child: Container(
+                  color: Colors.black.withOpacity(0.7),
+                  child: Center(child: _buildRecordingIndicator()),
+                ),
+              ),
+          ],
+        ),
       ),
     );
+  }
+
+  /// 生成当前状态的MD5哈希值
+  String _generateStateHash() {
+    // 创建包含所有状态信息的Map
+    final stateData = {
+      'content': _textController.text,
+      'images': _selectedImages.map((img) => base64Encode(img)).toList(),
+      'audioPaths': _audioPaths,
+      'audioNames': _audioNames,
+      'audioDurations': _audioDurations.map((d) => d.inMilliseconds).toList(),
+      'audioRecordTimes': _audioRecordTimes
+          .map((t) => t.toIso8601String())
+          .toList(),
+    };
+
+    // 将Map转换为JSON字符串
+    final jsonString = jsonEncode(stateData);
+
+    // 生成MD5哈希值
+    final bytes = utf8.encode(jsonString);
+    final digest = md5.convert(bytes);
+
+    return digest.toString();
+  }
+
+  /// 检查是否有未保存的修改
+  bool _hasChanges() {
+    if (_initialStateHash == null) {
+      print('初始状态哈希值为空，返回false');
+      return false;
+    }
+    final currentHash = _generateStateHash();
+    final hasChanges = _initialStateHash != currentHash;
+
+    // 调试信息
+    print('初始状态哈希值: $_initialStateHash');
+    print('当前状态哈希值: $currentHash');
+    print('是否有修改: $hasChanges');
+
+    return hasChanges;
+  }
+
+  /// 显示保存确认对话框
+  Future<bool> _showSaveConfirmDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text(
+                '保存提示',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+              content: const Text(
+                '您有未保存的修改，是否要保存？',
+                style: TextStyle(fontSize: 16),
+              ),
+              actions: [
+                // 使用Expanded让两个按钮各占一半宽度
+                Expanded(
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(false); // 不保存
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: const Text(
+                      '不保存',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey, // 灰色
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(true); // 保存
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: const Text(
+                      '保存',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black, // 黑色
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+  }
+
+  /// 重置初始状态哈希值（在保存成功后调用）
+  void _resetInitialStateHash() {
+    _initialStateHash = _generateStateHash();
+    print('重置初始状态哈希值: $_initialStateHash');
+  }
+
+  /// 处理返回按钮点击
+  Future<void> _handleBackPress() async {
+    if (_hasChanges()) {
+      final shouldSave = await _showSaveConfirmDialog();
+      if (shouldSave) {
+        // 用户选择保存，不自动返回
+        final success = await _saveDiary(autoReturn: false);
+        if (success && mounted) {
+          // 保存成功后手动返回
+          Navigator.of(context).pop();
+        }
+        return;
+      }
+      // 用户选择不保存，直接返回
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } else {
+      // 没有修改，直接返回
+      Navigator.of(context).pop();
+    }
   }
 
   String _getFormattedDate() {
@@ -1181,13 +1351,13 @@ class _AudioListItemState extends State<_AudioListItem> {
           GestureDetector(
             onTap: widget.onDelete,
             child: Container(
-              width: 32,
-              height: 32,
+              width: 24,
+              height: 24,
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(16),
+                color: Colors.grey.withOpacity(0.5),
+                shape: BoxShape.circle,
               ),
-              child: Icon(Icons.delete, color: Colors.grey.shade600, size: 18),
+              child: const Icon(Icons.close, color: Colors.white, size: 16),
             ),
           ),
         ],
