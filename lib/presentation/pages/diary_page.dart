@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +8,6 @@ import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import '../states/providers.dart';
-import '../../data/models/daily_steps.dart';
 import '../../data/models/audio_file.dart';
 
 class DiaryPage extends ConsumerStatefulWidget {
@@ -536,67 +534,64 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
       // 获取现有的日记数据
       final existingDiary = await diaryService.getTodayDiary();
 
-      // 清理旧文件（如果存在）
-      if (existingDiary != null) {
-        final today = DateTime.now();
-        final todayId =
-            '${today.year}${today.month.toString().padLeft(2, '0')}${today.day.toString().padLeft(2, '0')}';
-        await diaryService.deleteDiary(todayId);
-      }
+      // 创建AudioFile对象列表（使用新的保存方式）
+      final List<AudioFile> audioFiles = [];
 
-      // 保存图片到文件系统
-      final List<String> imagePaths = [];
-      for (int i = 0; i < _selectedImages.length; i++) {
-        final imagePath = await diaryService.saveImageToStorage(
-          _selectedImages[i],
-          'diary_image_${DateTime.now().millisecondsSinceEpoch}_$i.jpg',
-        );
-        if (imagePath != null) {
-          imagePaths.add(imagePath);
-        }
-      }
-
-      // 保存音频到文件系统
-      final List<String> audioPaths = [];
+      // 处理音频文件：只保存新录制的音频，保留已存在的音频
       for (int i = 0; i < _audioPaths.length; i++) {
-        // 检查音频文件是否存在
         final audioFile = File(_audioPaths[i]);
         if (await audioFile.exists()) {
-          final audioPath = await diaryService.saveAudioToStorage(
-            _audioPaths[i],
-            'diary_audio_${DateTime.now().millisecondsSinceEpoch}_$i.m4a',
-          );
-          if (audioPath != null) {
-            audioPaths.add(audioPath);
+          // 检查是否是临时录音文件（新录制的）
+          if (_audioPaths[i].contains('/tmp/') ||
+              _audioPaths[i].contains('cache')) {
+            // 新录制的音频文件，需要保存
+            final savedAudioFile = await diaryService.saveAudioDirectly(
+              sourcePath: _audioPaths[i],
+              displayName: _audioNames[i],
+              duration: _audioDurations[i].inMilliseconds,
+              recordTime: _audioRecordTimes[i],
+            );
+            if (savedAudioFile != null) {
+              audioFiles.add(savedAudioFile);
+            }
+          } else {
+            // 已存在的音频文件，直接使用
+            final existingAudioFile = AudioFile.create(
+              displayName: _audioNames[i],
+              filePath: _audioPaths[i],
+              duration: _audioDurations[i].inMilliseconds,
+              recordTime: _audioRecordTimes[i],
+            );
+            audioFiles.add(existingAudioFile);
           }
         } else {
           print('音频文件不存在: ${_audioPaths[i]}');
         }
       }
 
-      // 创建AudioFile对象列表
-      final List<AudioFile> audioFiles = [];
-      for (int i = 0; i < audioPaths.length; i++) {
-        if (i < _audioNames.length &&
-            i < _audioDurations.length &&
-            i < _audioRecordTimes.length) {
-          audioFiles.add(
-            AudioFile.create(
-              displayName: _audioNames[i],
-              filePath: audioPaths[i],
-              duration: _audioDurations[i].inMilliseconds,
-              recordTime: _audioRecordTimes[i],
-            ),
-          );
-        }
-      }
+      // 如果有现有日记，只更新内容，不删除文件
+      if (existingDiary != null) {
+        // 更新现有日记，保留未删除的音频文件
+        final updatedDiary = existingDiary.copyWith(
+          content: _textController.text.trim(),
+          imagePaths: [], // 图片会通过saveTodayDiary重新处理
+          audioFiles: audioFiles,
+        );
 
-      // 保存日记到数据库
-      await diaryService.saveTodayDiary(
-        content: _textController.text.trim(),
-        imageDataList: _selectedImages,
-        audioFiles: audioFiles,
-      );
+        // 保存更新的日记
+        await diaryService.saveTodayDiary(
+          content: updatedDiary.content,
+          imageDataList: _selectedImages,
+          audioFiles: updatedDiary.audioFiles,
+        );
+      } else {
+        // 创建新日记
+        await diaryService.saveTodayDiary(
+          content: _textController.text.trim(),
+          imageDataList: _selectedImages,
+          audioFiles: audioFiles,
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1061,6 +1056,7 @@ class _AudioListItemState extends State<_AudioListItem> {
       _isEditing = false;
     });
     final trimmedText = _nameController.text.trim();
+    // 确保显示名称不超过6个字符
     final limitedText = trimmedText.length > 6
         ? trimmedText.substring(0, 6)
         : trimmedText;

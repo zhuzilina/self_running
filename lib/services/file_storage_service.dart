@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -21,10 +20,11 @@ class FileStorageService {
   }
 
   /// 获取指定日期的文件存储目录
+  /// 目录结构: /data/20250816/
   Future<Directory> _getDateDirectory(String dateId) async {
     final docsDir = await _documentsDirectory;
-    final year = dateId.substring(0, 4);
-    final dateDir = Directory(join(docsDir.path, year, dateId));
+    // 直接使用dateId作为目录名，如20250816
+    final dateDir = Directory(join(docsDir.path, 'data', dateId));
     if (!await dateDir.exists()) {
       await dateDir.create(recursive: true);
     }
@@ -32,6 +32,7 @@ class FileStorageService {
   }
 
   /// 获取图片存储目录（按日期组织）
+  /// 目录结构: /data/20250816/images/
   Future<Directory> getImagesDirectory(String dateId) async {
     final dateDir = await _getDateDirectory(dateId);
     final imagesDir = Directory(join(dateDir.path, 'images'));
@@ -42,6 +43,7 @@ class FileStorageService {
   }
 
   /// 获取音频存储目录（按日期组织）
+  /// 目录结构: /data/20250816/audio/
   Future<Directory> getAudioDirectory(String dateId) async {
     final dateDir = await _getDateDirectory(dateId);
     final audioDir = Directory(join(dateDir.path, 'audio'));
@@ -51,13 +53,14 @@ class FileStorageService {
     return audioDir;
   }
 
-  /// 生成文件的hash编码
+  /// 生成文件的MD5 hash编码（32字符）
   String _generateHash(Uint8List data, String extension) {
-    final hash = sha256.convert(data);
+    final hash = md5.convert(data);
     return '${hash.toString()}.$extension';
   }
 
   /// 直接保存图片到指定日期的目录
+  /// 使用MD5 hash文件名保存，确保唯一性
   Future<String?> saveImageDirectly(
     Uint8List imageData,
     String originalName,
@@ -80,6 +83,7 @@ class FileStorageService {
   }
 
   /// 直接保存音频到指定日期的目录
+  /// 使用MD5 hash文件名保存，确保唯一性
   Future<String?> saveAudioDirectly(
     String sourcePath,
     String originalName,
@@ -168,36 +172,32 @@ class FileStorageService {
       int totalAudioCount = 0;
       int totalAudioSize = 0;
 
-      // 遍历所有年份目录
-      if (await docsDir.exists()) {
-        final yearDirs = docsDir.listSync();
-        for (final yearDir in yearDirs) {
-          if (yearDir is Directory) {
-            final dateDirs = yearDir.listSync();
-            for (final dateDir in dateDirs) {
-              if (dateDir is Directory) {
-                // 统计图片
-                final imagesDir = Directory(join(dateDir.path, 'images'));
-                if (await imagesDir.exists()) {
-                  final imageFiles = imagesDir.listSync();
-                  for (final file in imageFiles) {
-                    if (file is File) {
-                      totalImageCount++;
-                      totalImageSize += await file.length();
-                    }
-                  }
+      // 遍历data目录下的所有日期目录
+      final dataDir = Directory(join(docsDir.path, 'data'));
+      if (await dataDir.exists()) {
+        final dateDirs = dataDir.listSync();
+        for (final dateDir in dateDirs) {
+          if (dateDir is Directory) {
+            // 统计图片
+            final imagesDir = Directory(join(dateDir.path, 'images'));
+            if (await imagesDir.exists()) {
+              final imageFiles = imagesDir.listSync();
+              for (final file in imageFiles) {
+                if (file is File) {
+                  totalImageCount++;
+                  totalImageSize += await file.length();
                 }
+              }
+            }
 
-                // 统计音频
-                final audioDir = Directory(join(dateDir.path, 'audio'));
-                if (await audioDir.exists()) {
-                  final audioFiles = audioDir.listSync();
-                  for (final file in audioFiles) {
-                    if (file is File) {
-                      totalAudioCount++;
-                      totalAudioSize += await file.length();
-                    }
-                  }
+            // 统计音频
+            final audioDir = Directory(join(dateDir.path, 'audio'));
+            if (await audioDir.exists()) {
+              final audioFiles = audioDir.listSync();
+              for (final file in audioFiles) {
+                if (file is File) {
+                  totalAudioCount++;
+                  totalAudioSize += await file.length();
                 }
               }
             }

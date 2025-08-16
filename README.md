@@ -172,5 +172,6 @@ class DailySteps {
 
 ## 许可证
 
-暂未指定许可证，默认仅供学习与研究使用。
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
 
