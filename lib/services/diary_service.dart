@@ -243,6 +243,18 @@ class DiaryService {
     }
   }
 
+  /// 搜索日记内容
+  Future<List<Diary>> searchDiaries(String query) async {
+    try {
+      if (query.trim().isEmpty) {
+        return await _databaseService.getAllDiaries();
+      }
+      return await _databaseService.searchDiaries(query.trim());
+    } catch (e) {
+      throw Exception('搜索日记失败: $e');
+    }
+  }
+
   /// 删除日记（包括音频文件）
   Future<void> deleteDiary(String dateId) async {
     try {

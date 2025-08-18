@@ -64,6 +64,18 @@ final allDiariesProvider = FutureProvider<List<Diary>>((ref) async {
   return diaryService.getAllDiaries();
 });
 
+// 搜索查询状态Provider
+final searchQueryProvider = StateProvider<String>((ref) => '');
+
+// 搜索日记Provider
+final searchDiariesProvider = FutureProvider.family<List<Diary>, String>((
+  ref,
+  query,
+) async {
+  final diaryService = ref.read(diaryServiceProvider);
+  return diaryService.searchDiaries(query);
+});
+
 final healthRepositoryProvider = Provider<HealthRepository>((ref) {
   return HealthRepository();
 });

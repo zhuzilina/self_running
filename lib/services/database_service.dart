@@ -284,6 +284,46 @@ class DatabaseService {
     return List.generate(maps.length, (i) => _rowToDiary(maps[i]));
   }
 
+  /// 搜索日记内容和日期
+  Future<List<Diary>> searchDiaries(String query) async {
+    final db = await database;
+
+    // 检查是否为纯数字（可能是日期相关）
+    final isNumeric = int.tryParse(query) != null;
+
+    if (isNumeric) {
+      // 如果是数字，尝试多种日期格式匹配
+      final List<Map<String, dynamic>> maps = await db.query(
+        'diaries',
+        where: '''
+          content LIKE ? OR 
+          date LIKE ? OR 
+          date LIKE ? OR 
+          date LIKE ? OR
+          id LIKE ? OR
+          id LIKE ?
+        ''',
+        whereArgs: [
+          '%$query%', // 内容匹配
+          '%$query%', // 完整日期匹配
+          '%$query-%', // 年份匹配 (如: 2024-)
+          '%-$query-%', // 月份匹配 (如: -01-)
+          '$query%', // ID前缀匹配 (如: 20240115)
+          '%$query%', // ID包含匹配 (如: 20240115)
+        ],
+      );
+      return List.generate(maps.length, (i) => _rowToDiary(maps[i]));
+    } else {
+      // 非数字查询，使用原来的逻辑
+      final List<Map<String, dynamic>> maps = await db.query(
+        'diaries',
+        where: 'content LIKE ? OR date LIKE ?',
+        whereArgs: ['%$query%', '%$query%'],
+      );
+      return List.generate(maps.length, (i) => _rowToDiary(maps[i]));
+    }
+  }
+
   Future<void> deleteDiary(String id) async {
     final db = await database;
     await db.delete('diaries', where: 'id = ?', whereArgs: [id]);

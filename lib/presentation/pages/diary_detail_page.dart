@@ -472,6 +472,8 @@ class _DiaryDetailPageState extends ConsumerState<DiaryDetailPage> {
                                 color: Colors.grey[600],
                                 fontStyle: FontStyle.italic,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ),

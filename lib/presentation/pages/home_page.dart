@@ -42,7 +42,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Scaffold(
       extendBodyBehindAppBar: _index != 2, // 只有在第三屏时不延伸到AppBar后面
       backgroundColor: Colors.white, // 设置整体背景为白色
-      appBar: _index == 2
+      appBar: (_index == 1 || _index == 2)
           ? null
           : AppBar(
               // 第三屏不显示AppBar

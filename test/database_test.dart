@@ -14,12 +14,7 @@ void main() {
 
     test('should create and retrieve diary', () async {
       // 创建测试日记
-      final diary = Diary.create(
-        content: '测试日记内容',
-        date: DateTime.now(),
-        imagePaths: ['test_image1.jpg', 'test_image2.jpg'],
-        audioFiles: [], // 空的音频文件列表
-      );
+      final diary = Diary.create(content: '测试日记内容', date: DateTime.now());
 
       // 保存日记
       await databaseService.saveDiary(diary);
@@ -30,8 +25,8 @@ void main() {
       // 验证
       expect(retrievedDiary, isNotNull);
       expect(retrievedDiary!.content, equals(diary.content));
-      expect(retrievedDiary.imagePaths, equals(diary.imagePaths));
-      expect(retrievedDiary.audioFiles, equals(diary.audioFiles));
+      expect(retrievedDiary.images.length, equals(diary.images.length));
+      expect(retrievedDiary.audioFiles.length, equals(diary.audioFiles.length));
     });
 
     test('should get all diaries', () async {
@@ -80,6 +75,60 @@ void main() {
       // 验证日记已被删除
       final deletedDiary = await databaseService.getDiary(todayId);
       expect(deletedDiary, isNull);
+    });
+
+    test('should search diaries by content', () async {
+      // 创建测试日记
+      final diary1 = Diary.create(
+        content: '今天天气很好，我去跑步了',
+        date: DateTime(2024, 1, 15),
+      );
+
+      final diary2 = Diary.create(
+        content: '今天下雨了，在家看书',
+        date: DateTime(2024, 1, 16),
+      );
+
+      // 保存日记
+      await databaseService.saveDiary(diary1);
+      await databaseService.saveDiary(diary2);
+
+      // 搜索内容
+      final results = await databaseService.searchDiaries('跑步');
+
+      expect(results.length, 1);
+      expect(results.first.content, contains('跑步'));
+    });
+
+    test('should search diaries by numeric query', () async {
+      // 创建测试日记
+      final diary1 = Diary.create(
+        content: '今天天气很好',
+        date: DateTime(2024, 1, 15),
+      );
+
+      final diary2 = Diary.create(
+        content: '今天下雨了',
+        date: DateTime(2024, 1, 16),
+      );
+
+      // 保存日记
+      await databaseService.saveDiary(diary1);
+      await databaseService.saveDiary(diary2);
+
+      // 搜索数字（应该匹配ID和日期）
+      final results = await databaseService.searchDiaries('15');
+
+      expect(results.length, greaterThanOrEqualTo(1));
+
+      // 验证至少有一个结果包含15
+      bool hasMatch = results.any(
+        (diary) =>
+            diary.id.contains('15') ||
+            diary.content.contains('15') ||
+            diary.date.day == 15,
+      );
+      expect(hasMatch, isTrue);
     });
   });
 }

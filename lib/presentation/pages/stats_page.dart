@@ -13,194 +13,258 @@ import 'package:percent_indicator/percent_indicator.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'diary_detail_page.dart';
 
-class StatsPage extends ConsumerWidget {
+class StatsPage extends ConsumerStatefulWidget {
   const StatsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final diariesAsync = ref.watch(allDiariesProvider);
+  ConsumerState<StatsPage> createState() => _StatsPageState();
+}
+
+class _StatsPageState extends ConsumerState<StatsPage> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final searchQuery = ref.watch(searchQueryProvider);
+    final diariesAsync = searchQuery.isEmpty
+        ? ref.watch(allDiariesProvider)
+        : ref.watch(searchDiariesProvider(searchQuery));
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.grey[50],
+        backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text('足迹'),
-        surfaceTintColor: Colors.transparent,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.refresh(allDiariesProvider),
+        surfaceTintColor: Colors.white,
+        title: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey.withOpacity(0.2), width: 1),
+            boxShadow: [],
           ),
-        ],
-      ),
-      body: diariesAsync.when(
-        loading: () => const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('正在加载日记数据...'),
-            ],
-          ),
-        ),
-        error: (e, _) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error, size: 64, color: Colors.red),
-              SizedBox(height: 16),
-              Text('加载失败：$e'),
-              SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.refresh(allDiariesProvider),
-                child: Text('重试'),
-              ),
-            ],
-          ),
-        ),
-        data: (diaries) {
-          if (diaries.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.history, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text(
-                    '暂无足迹记录',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    '开始记录你的每一天',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          // 按日期排序，最新的在前面
-          final sortedDiaries = List<Diary>.from(diaries)
-            ..sort((a, b) => b.date.compareTo(a.date));
-
-          // 获取置顶日记ID列表
-          final pinnedDiariesAsync = ref.watch(pinnedDiariesProvider);
-          final pinnedDiaryIds = pinnedDiariesAsync.when(
-            data: (pinnedDiaries) => pinnedDiaries.map((d) => d.id).toSet(),
-            loading: () => <String>{},
-            error: (_, __) => <String>{},
-          );
-
-          // 过滤掉已置顶的日记
-          final nonPinnedDiaries = sortedDiaries
-              .where((diary) => !pinnedDiaryIds.contains(diary.id))
-              .toList();
-
-          // 按年份和月份分组
-          final groupedDiaries = _groupDiariesByYearMonth(nonPinnedDiaries);
-
-          return CustomScrollView(
-            slivers: [
-              // 置顶日记
-              Consumer(
-                builder: (context, ref, child) {
-                  final pinnedDiariesAsync = ref.watch(pinnedDiariesProvider);
-                  return pinnedDiariesAsync.when(
-                    loading: () =>
-                        const SliverToBoxAdapter(child: SizedBox.shrink()),
-                    error: (_, __) =>
-                        const SliverToBoxAdapter(child: SizedBox.shrink()),
-                    data: (pinnedDiaries) {
-                      if (pinnedDiaries.isEmpty) {
-                        return const SliverToBoxAdapter(
-                          child: SizedBox.shrink(),
-                        );
-                      }
-
-                      return SliverStickyHeader(
-                        header: Container(
-                          height: 50.0,
-                          color: Colors.transparent,
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            '置顶',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ),
-                        sliver: SliverList(
-                          delegate: SliverChildBuilderDelegate((
-                            context,
-                            index,
-                          ) {
-                            final diary = pinnedDiaries[index];
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0,
-                                vertical: 8.0,
-                              ),
-                              child: _buildDiaryCard(
-                                context,
-                                diary,
-                                ref,
-                                pinnedDiaries,
-                              ),
-                            );
-                          }, childCount: pinnedDiaries.length),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-              // 日记列表
-              ...groupedDiaries.entries.map((entry) {
-                final yearMonth = entry.key;
-                final diariesInMonth = entry.value;
-
-                return SliverStickyHeader(
-                  header: Container(
-                    height: 50.0,
-                    color: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      yearMonth,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
+          child: TextField(
+            controller: _searchController,
+            cursorColor: Colors.grey.withOpacity(0.7),
+            decoration: InputDecoration(
+              hintText: '搜索日记内容、日期或数字...',
+              hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),
+              prefixIcon: Icon(Icons.search, color: Colors.grey[500], size: 20),
+              suffixIcon: searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: Icon(
+                        Icons.clear,
+                        color: Colors.grey[500],
+                        size: 20,
                       ),
+                      onPressed: () {
+                        _searchController.clear();
+                        ref.read(searchQueryProvider.notifier).state = '';
+                      },
+                    )
+                  : null,
+              border: InputBorder.none,
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
+            ),
+            style: const TextStyle(fontSize: 14),
+            onChanged: (value) {
+              ref.read(searchQueryProvider.notifier).state = value;
+            },
+          ),
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.refresh(allDiariesProvider);
+        },
+        child: diariesAsync.when(
+          loading: () => const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('正在加载日记数据...'),
+              ],
+            ),
+          ),
+          error: (e, _) => Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error, size: 64, color: Colors.red),
+                SizedBox(height: 16),
+                Text('加载失败：$e'),
+                SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => ref.refresh(allDiariesProvider),
+                  child: Text('重试'),
+                ),
+              ],
+            ),
+          ),
+          data: (diaries) {
+            if (diaries.isEmpty) {
+              return ListView(
+                children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          searchQuery.isNotEmpty
+                              ? Icons.search_off
+                              : Icons.history,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          searchQuery.isNotEmpty ? '未找到相关日记' : '暂无足迹记录',
+                          style: TextStyle(fontSize: 18, color: Colors.grey),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          searchQuery.isNotEmpty ? '尝试使用其他关键词搜索' : '开始记录你的每一天',
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                      ],
                     ),
                   ),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate((context, index) {
-                      final diary = diariesInMonth[index];
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16.0,
-                          vertical: 8.0,
+                ],
+              );
+            }
+
+            // 按日期排序，最新的在前面
+            final sortedDiaries = List<Diary>.from(diaries)
+              ..sort((a, b) => b.date.compareTo(a.date));
+
+            // 获取置顶日记ID列表
+            final pinnedDiariesAsync = ref.watch(pinnedDiariesProvider);
+            final pinnedDiaryIds = pinnedDiariesAsync.when(
+              data: (pinnedDiaries) => pinnedDiaries.map((d) => d.id).toSet(),
+              loading: () => <String>{},
+              error: (_, __) => <String>{},
+            );
+
+            // 过滤掉已置顶的日记
+            final nonPinnedDiaries = sortedDiaries
+                .where((diary) => !pinnedDiaryIds.contains(diary.id))
+                .toList();
+
+            // 按年份和月份分组
+            final groupedDiaries = _groupDiariesByYearMonth(nonPinnedDiaries);
+
+            return CustomScrollView(
+              slivers: [
+                // 置顶日记
+                Consumer(
+                  builder: (context, ref, child) {
+                    final pinnedDiariesAsync = ref.watch(pinnedDiariesProvider);
+                    return pinnedDiariesAsync.when(
+                      loading: () =>
+                          const SliverToBoxAdapter(child: SizedBox.shrink()),
+                      error: (_, __) =>
+                          const SliverToBoxAdapter(child: SizedBox.shrink()),
+                      data: (pinnedDiaries) {
+                        if (pinnedDiaries.isEmpty) {
+                          return const SliverToBoxAdapter(
+                            child: SizedBox.shrink(),
+                          );
+                        }
+
+                        return SliverStickyHeader(
+                          header: Container(
+                            height: 50.0,
+                            color: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0,
+                            ),
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '置顶',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate((
+                              context,
+                              index,
+                            ) {
+                              final diary = pinnedDiaries[index];
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 8.0,
+                                ),
+                                child: _buildDiaryCard(
+                                  context,
+                                  diary,
+                                  ref,
+                                  diaries,
+                                ),
+                              );
+                            }, childCount: pinnedDiaries.length),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+                // 日记列表
+                ...groupedDiaries.entries.map((entry) {
+                  final yearMonth = entry.key;
+                  final diariesInMonth = entry.value;
+
+                  return SliverStickyHeader(
+                    header: Container(
+                      height: 50.0,
+                      color: Colors.transparent,
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        yearMonth,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
                         ),
-                        child: _buildDiaryCard(
-                          context,
-                          diary,
-                          ref,
-                          nonPinnedDiaries,
-                        ),
-                      );
-                    }, childCount: diariesInMonth.length),
-                  ),
-                );
-              }).toList(),
-            ],
-          );
-        },
+                      ),
+                    ),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final diary = diariesInMonth[index];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 8.0,
+                          ),
+                          child: _buildDiaryCard(context, diary, ref, diaries),
+                        );
+                      }, childCount: diariesInMonth.length),
+                    ),
+                  );
+                }).toList(),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -213,7 +277,29 @@ class StatsPage extends ConsumerWidget {
   ) {
     final dateFormat = DateFormat('yyyy年MM月dd日');
     final timeFormat = DateFormat('HH:mm');
-    final weekdayFormat = DateFormat('EEEE');
+
+    // 将英文星期转换为中文格式
+    String _getChineseWeekday(DateTime date) {
+      final weekday = date.weekday;
+      switch (weekday) {
+        case 1:
+          return '周一';
+        case 2:
+          return '周二';
+        case 3:
+          return '周三';
+        case 4:
+          return '周四';
+        case 5:
+          return '周五';
+        case 6:
+          return '周六';
+        case 7:
+          return '周日';
+        default:
+          return '未知';
+      }
+    }
 
     return GestureDetector(
       onTap: () {
@@ -263,11 +349,15 @@ class StatsPage extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          '加载中...',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
+                        Expanded(
+                          child: Text(
+                            '加载中...',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                         const Spacer(),
@@ -285,11 +375,15 @@ class StatsPage extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          '加载失败',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
+                        Expanded(
+                          child: Text(
+                            '加载失败',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                         const Spacer(),
@@ -324,11 +418,15 @@ class StatsPage extends ConsumerWidget {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              '未知用户',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
+                            Expanded(
+                              child: Text(
+                                '未知用户',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
                             ),
                             const Spacer(),
@@ -358,13 +456,17 @@ class StatsPage extends ConsumerWidget {
                                 : null,
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            userData.nickname.isNotEmpty
-                                ? userData.nickname
-                                : '我的日记',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
+                          Expanded(
+                            child: Text(
+                              userData.nickname.isNotEmpty
+                                  ? userData.nickname
+                                  : '我的日记',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
                           ),
                           const Spacer(),
@@ -452,7 +554,7 @@ class StatsPage extends ConsumerWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    weekdayFormat.format(diary.date),
+                    _getChineseWeekday(diary.date),
                     style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
                   const Spacer(),

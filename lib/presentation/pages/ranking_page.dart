@@ -137,6 +137,8 @@ class RankingPage extends ConsumerWidget {
                                 fontWeight: FontWeight.w600,
                                 color: Colors.black87,
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -225,6 +227,8 @@ class RankingPage extends ConsumerWidget {
                                 fontWeight: FontWeight.w600,
                                 color: Colors.black87,
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Text(
