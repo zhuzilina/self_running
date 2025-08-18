@@ -14,11 +14,8 @@ class UserProfile {
   });
 
   factory UserProfile.defaultProfile() {
-    final now = DateTime.now();
-    final dateId =
-        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
     return UserProfile(
-      nickname: '吃个炸鸡$dateId',
+      nickname: '吃个炸鸡',
       slogan: '无忧无虑又一天',
       avatar: 'assets/images/avatar.jpg',
       coverImage: 'assets/images/user_bg.jpg',
@@ -53,12 +50,9 @@ class UserProfile {
   }
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
-    final now = DateTime.now();
-    final dateId =
-        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
     return UserProfile(
       avatar: json['avatar'],
-      nickname: json['nickname'] ?? '吃个炸鸡$dateId',
+      nickname: json['nickname'] ?? '吃个炸鸡',
       slogan: json['slogan'] ?? '无忧无虑又一天',
       coverImage: json['coverImage'],
       lastUpdated: json['lastUpdated'] != null

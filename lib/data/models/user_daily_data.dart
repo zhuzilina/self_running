@@ -8,6 +8,7 @@ class UserDailyData {
   final DateTime date;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final bool isEditable; // 是否允许编辑
 
   UserDailyData({
     required this.id,
@@ -19,6 +20,7 @@ class UserDailyData {
     required this.date,
     required this.createdAt,
     this.updatedAt,
+    this.isEditable = true, // 默认允许编辑
   });
 
   factory UserDailyData.create({
@@ -28,6 +30,7 @@ class UserDailyData {
     String? backgroundPath,
     required int steps,
     required DateTime date,
+    bool isEditable = true,
   }) {
     final now = DateTime.now();
     final id =
@@ -43,6 +46,7 @@ class UserDailyData {
       date: date,
       createdAt: now,
       updatedAt: now,
+      isEditable: isEditable,
     );
   }
 
@@ -53,6 +57,7 @@ class UserDailyData {
     String? backgroundPath,
     int? steps,
     DateTime? updatedAt,
+    bool? isEditable,
   }) {
     return UserDailyData(
       id: id,
@@ -64,6 +69,7 @@ class UserDailyData {
       date: date,
       createdAt: createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
+      isEditable: isEditable ?? this.isEditable,
     );
   }
 
@@ -78,6 +84,7 @@ class UserDailyData {
       'date': date.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
+      'is_editable': isEditable ? 1 : 0,
     };
   }
 
@@ -94,6 +101,7 @@ class UserDailyData {
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'] as String)
           : null,
+      isEditable: (json['is_editable'] as int?) == 1,
     );
   }
 

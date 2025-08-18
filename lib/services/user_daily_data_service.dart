@@ -20,6 +20,110 @@ class UserDailyDataService {
     }
   }
 
+  /// 预保存今日用户数据（立即保存，不检查日期）
+  Future<void> preSaveTodayUserData({
+    required String nickname,
+    required String slogan,
+    Uint8List? avatarData,
+    Uint8List? backgroundData,
+    required int steps,
+  }) async {
+    try {
+      final today = DateTime.now();
+      final todayId =
+          '${today.year}${today.month.toString().padLeft(2, '0')}${today.day.toString().padLeft(2, '0')}';
+
+      // 保存头像文件
+      String? avatarPath;
+      if (avatarData != null) {
+        avatarPath = await _fileStorageService.saveImage(
+          avatarData,
+          'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+      }
+
+      // 保存背景文件
+      String? backgroundPath;
+      if (backgroundData != null) {
+        backgroundPath = await _fileStorageService.saveImage(
+          backgroundData,
+          'background_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+      }
+
+      final userData = UserDailyData.create(
+        nickname: nickname,
+        slogan: slogan,
+        avatarPath: avatarPath,
+        backgroundPath: backgroundPath,
+        steps: steps,
+        date: today,
+        isEditable: true, // 预保存时默认可编辑
+      );
+
+      // 使用预保存方法，立即保存
+      await _databaseService.preSaveUserDailyData(userData);
+    } catch (e) {
+      throw Exception('预保存今日用户数据失败: $e');
+    }
+  }
+
+  /// 检查并更新编辑状态（当日期变化时调用）
+  Future<void> updateEditableStatusForDateChange() async {
+    try {
+      await _databaseService.updateEditableStatusForDateChange();
+    } catch (e) {
+      throw Exception('更新编辑状态失败: $e');
+    }
+  }
+
+  /// 检查今日记录是否可编辑
+  Future<bool> isTodayEditable() async {
+    try {
+      final today = DateTime.now();
+      return await _databaseService.isDateEditable(today);
+    } catch (e) {
+      throw Exception('检查今日编辑状态失败: $e');
+    }
+  }
+
+  /// 获取指定日期的用户数据
+  Future<UserDailyData?> getUserDataByDate(DateTime date) async {
+    try {
+      return await _databaseService.getUserDailyDataByDate(date);
+    } catch (e) {
+      throw Exception('获取指定日期用户数据失败: $e');
+    }
+  }
+
+  /// 智能保存用户数据（检查编辑权限）
+  Future<void> smartSaveUserData({
+    required String nickname,
+    required String slogan,
+    Uint8List? avatarData,
+    Uint8List? backgroundData,
+    required int steps,
+  }) async {
+    try {
+      // 首先检查今日是否可编辑
+      final isEditable = await isTodayEditable();
+      if (!isEditable) {
+        throw Exception('今日记录已锁定，无法修改');
+      }
+
+      // 如果可编辑，则进行预保存
+      await preSaveTodayUserData(
+        nickname: nickname,
+        slogan: slogan,
+        avatarData: avatarData,
+        backgroundData: backgroundData,
+        steps: steps,
+      );
+    } catch (e) {
+      throw Exception('智能保存用户数据失败: $e');
+    }
+  }
+
   /// 保存今日用户数据
   Future<void> saveTodayUserData({
     required String nickname,
@@ -219,6 +323,56 @@ class UserDailyDataService {
       return await _databaseService.getUserDailyDataWithDiary(id);
     } catch (e) {
       throw Exception('获取用户数据和日记失败: $e');
+    }
+  }
+
+  /// 为指定日期创建用户数据（用于测试）
+  Future<void> createUserDataForDate({
+    required String nickname,
+    required String slogan,
+    Uint8List? avatarData,
+    Uint8List? backgroundData,
+    required int steps,
+    required DateTime date,
+  }) async {
+    try {
+      final dateId =
+          '${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}';
+
+      // 保存头像文件
+      String? avatarPath;
+      if (avatarData != null) {
+        avatarPath = await _fileStorageService.saveImage(
+          avatarData,
+          'avatar_${date.millisecondsSinceEpoch}.jpg',
+        );
+      }
+
+      // 保存背景文件
+      String? backgroundPath;
+      if (backgroundData != null) {
+        backgroundPath = await _fileStorageService.saveImage(
+          backgroundData,
+          'background_${date.millisecondsSinceEpoch}.jpg',
+        );
+      }
+
+      final userData = UserDailyData(
+        id: dateId,
+        nickname: nickname,
+        slogan: slogan,
+        avatarPath: avatarPath,
+        backgroundPath: backgroundPath,
+        steps: steps,
+        date: date,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        isEditable: true,
+      );
+
+      await _databaseService.saveUserDailyData(userData);
+    } catch (e) {
+      throw Exception('为指定日期创建用户数据失败: $e');
     }
   }
 }

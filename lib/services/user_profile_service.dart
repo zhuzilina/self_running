@@ -6,6 +6,8 @@ import 'storage_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import '../data/models/user_daily_data.dart'; // Added import for UserDailyData
+import '../services/database_service.dart'; // Added import for DatabaseService
 
 class UserProfileService {
   static const String _profileKey = 'user_profile';
@@ -38,21 +40,71 @@ class UserProfileService {
     await box.put(_profileKey, jsonString);
   }
 
+  /// 更新用户配置并同步到每日数据
   Future<void> updateProfile({
-    String? avatar,
     String? nickname,
     String? slogan,
+    String? avatar,
     String? coverImage,
   }) async {
-    final currentProfile = await getUserProfile();
-    final updatedProfile = currentProfile.copyWith(
-      avatar: avatar,
-      nickname: nickname,
-      slogan: slogan,
-      coverImage: coverImage,
-      lastUpdated: DateTime.now(),
-    );
-    await saveUserProfile(updatedProfile);
+    try {
+      final currentProfile = await getUserProfile();
+
+      // 更新用户配置
+      final updatedProfile = currentProfile.copyWith(
+        nickname: nickname ?? currentProfile.nickname,
+        slogan: slogan ?? currentProfile.slogan,
+        avatar: avatar ?? currentProfile.avatar,
+        coverImage: coverImage ?? currentProfile.coverImage,
+      );
+
+      await saveUserProfile(updatedProfile);
+
+      // 同步更新今日的每日数据记录
+      await _syncToDailyData(updatedProfile);
+    } catch (e) {
+      throw Exception('更新用户配置失败: $e');
+    }
+  }
+
+  /// 同步用户配置到每日数据
+  Future<void> _syncToDailyData(UserProfile profile) async {
+    try {
+      final today = DateTime.now();
+      final todayId =
+          '${today.year}${today.month.toString().padLeft(2, '0')}${today.day.toString().padLeft(2, '0')}';
+
+      // 获取今日的每日数据记录
+      final databaseService = DatabaseService();
+      final existingData = await databaseService.getUserDailyData(todayId);
+
+      if (existingData != null) {
+        // 更新现有记录
+        final updatedData = existingData.copyWith(
+          nickname: profile.nickname,
+          slogan: profile.slogan,
+          avatarPath: profile.avatar,
+          backgroundPath: profile.coverImage,
+          updatedAt: DateTime.now(),
+        );
+        await databaseService.saveUserDailyData(updatedData);
+      } else {
+        // 创建新的今日记录
+        final newData = UserDailyData.create(
+          nickname: profile.nickname,
+          slogan: profile.slogan,
+          avatarPath: profile.avatar,
+          backgroundPath: profile.coverImage,
+          steps: 0,
+          date: today,
+          isEditable: true,
+        );
+        await databaseService.saveUserDailyData(newData);
+      }
+    } catch (e) {
+      print('同步用户配置到每日数据失败: $e');
+      // 不抛出异常，避免影响用户配置的更新
+    }
   }
 
   Future<String?> saveImageToLocal(

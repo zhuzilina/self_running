@@ -47,8 +47,6 @@ class _ProfileSettingsPageState extends ConsumerState<ProfileSettingsPage> {
     try {
       final XFile? pickedFile = await ImagePicker().pickImage(
         source: ImageSource.gallery,
-        maxWidth: 512,
-        maxHeight: 512,
       );
 
       if (pickedFile != null) {
@@ -93,8 +91,6 @@ class _ProfileSettingsPageState extends ConsumerState<ProfileSettingsPage> {
     try {
       final XFile? pickedFile = await ImagePicker().pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
       );
 
       if (pickedFile != null) {

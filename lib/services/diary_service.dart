@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import '../data/models/diary.dart';
 import '../data/models/audio_file.dart';
+import '../data/models/image_info.dart';
 import 'database_service.dart';
 import 'file_storage_service.dart';
 import 'audio_file_manager.dart';
@@ -22,11 +23,11 @@ class DiaryService {
     }
   }
 
-  /// 保存今日日记（智能更新，避免不必要的文件删除）
-  Future<void> saveTodayDiary({
+  /// 预保存今日日记（立即保存，不检查日期）
+  Future<void> preSaveTodayDiary({
     required String content,
     required List<Uint8List> imageDataList,
-    required List<AudioFile> audioFiles, // 使用AudioFile列表
+    required List<AudioFile> audioFiles,
   }) async {
     try {
       final today = DateTime.now();
@@ -36,16 +37,24 @@ class DiaryService {
       // 获取现有日记
       final existingDiary = await _databaseService.getDiary(todayId);
 
-      // 直接保存图片到目标目录（使用hash文件名）
-      final List<String> imagePaths = [];
+      // 保存图片（原图 + 缩略图）到目标目录
+      final List<ImageInfo> images = [];
       for (int i = 0; i < imageDataList.length; i++) {
-        final imagePath = await _fileStorageService.saveImageDirectly(
+        final imagePaths = await _fileStorageService.saveImageWithThumbnail(
           imageDataList[i],
           'diary_image_${DateTime.now().millisecondsSinceEpoch}_$i.jpg',
           todayId,
         );
-        if (imagePath != null) {
-          imagePaths.add(imagePath);
+        if (imagePaths != null) {
+          images.add(
+            ImageInfo(
+              originalPath: imagePaths['originalPath']!,
+              thumbnailPath: imagePaths['thumbnailPath']!,
+              originalName:
+                  'diary_image_${DateTime.now().millisecondsSinceEpoch}_$i.jpg',
+              createdAt: DateTime.now(),
+            ),
+          );
         }
       }
 
@@ -66,7 +75,116 @@ class DiaryService {
         // 更新日记对象
         final updatedDiary = existingDiary.copyWith(
           content: content,
-          imagePaths: imagePaths,
+          images: images,
+          audioFiles: audioFiles,
+          isEditable: true, // 预保存时确保可编辑
+        );
+
+        // 更新数据库
+        await _databaseService.saveDiary(updatedDiary);
+      } else {
+        // 创建新日记对象
+        final diary = Diary.create(
+          content: content,
+          date: today,
+          images: images,
+          audioFiles: audioFiles,
+          isEditable: true, // 预保存时默认可编辑
+        );
+
+        // 保存到数据库
+        await _databaseService.saveDiary(diary);
+      }
+
+      // 清理未使用的文件
+      final allUsedPaths = [
+        ...images.map((img) => img.originalPath),
+        ...images.map((img) => img.thumbnailPath),
+        ...audioFiles.map((a) => a.filePath),
+      ];
+      await _fileStorageService.cleanupUnusedFiles(todayId, allUsedPaths);
+    } catch (e) {
+      throw Exception('预保存今日日记失败: $e');
+    }
+  }
+
+  /// 智能保存今日日记（检查编辑权限）
+  Future<void> smartSaveTodayDiary({
+    required String content,
+    required List<Uint8List> imageDataList,
+    required List<AudioFile> audioFiles,
+  }) async {
+    try {
+      // 首先检查今日是否可编辑
+      final isEditable = await isTodayEditable();
+      if (!isEditable) {
+        throw Exception('今日记录已锁定，无法修改');
+      }
+
+      // 如果可编辑，则进行预保存
+      await preSaveTodayDiary(
+        content: content,
+        imageDataList: imageDataList,
+        audioFiles: audioFiles,
+      );
+    } catch (e) {
+      throw Exception('智能保存今日日记失败: $e');
+    }
+  }
+
+  /// 保存今日日记（智能更新，避免不必要的文件删除）
+  Future<void> saveTodayDiary({
+    required String content,
+    required List<Uint8List> imageDataList,
+    required List<AudioFile> audioFiles, // 使用AudioFile列表
+  }) async {
+    try {
+      final today = DateTime.now();
+      final todayId =
+          '${today.year}${today.month.toString().padLeft(2, '0')}${today.day.toString().padLeft(2, '0')}';
+
+      // 获取现有日记
+      final existingDiary = await _databaseService.getDiary(todayId);
+
+      // 保存图片（原图 + 缩略图）到目标目录
+      final List<ImageInfo> images = [];
+      for (int i = 0; i < imageDataList.length; i++) {
+        final imagePaths = await _fileStorageService.saveImageWithThumbnail(
+          imageDataList[i],
+          'diary_image_${DateTime.now().millisecondsSinceEpoch}_$i.jpg',
+          todayId,
+        );
+        if (imagePaths != null) {
+          images.add(
+            ImageInfo(
+              originalPath: imagePaths['originalPath']!,
+              thumbnailPath: imagePaths['thumbnailPath']!,
+              originalName:
+                  'diary_image_${DateTime.now().millisecondsSinceEpoch}_$i.jpg',
+              createdAt: DateTime.now(),
+            ),
+          );
+        }
+      }
+
+      // 如果有现有日记，进行智能更新
+      if (existingDiary != null) {
+        // 找出需要删除的音频文件（在现有日记中但不在新音频列表中的）
+        final existingAudioIds = existingDiary.audioFiles
+            .map((a) => a.id)
+            .toSet();
+        final newAudioIds = audioFiles.map((a) => a.id).toSet();
+        final audioIdsToDelete = existingAudioIds.difference(newAudioIds);
+
+        // 标记需要删除的音频文件
+        for (final audioId in audioIdsToDelete) {
+          await _audioFileManager.markAudioFileAsDeleted(audioId);
+        }
+
+        // 更新日记对象
+        final updatedDiary = existingDiary.copyWith(
+          content: content,
+          images: images,
           audioFiles: audioFiles,
         );
 
@@ -77,7 +195,7 @@ class DiaryService {
         final diary = Diary.create(
           content: content,
           date: today,
-          imagePaths: imagePaths,
+          images: images,
           audioFiles: audioFiles,
         );
 
@@ -87,12 +205,41 @@ class DiaryService {
 
       // 清理未使用的文件
       final allUsedPaths = [
-        ...imagePaths,
+        ...images.map((img) => img.originalPath),
+        ...images.map((img) => img.thumbnailPath),
         ...audioFiles.map((a) => a.filePath),
       ];
       await _fileStorageService.cleanupUnusedFiles(todayId, allUsedPaths);
     } catch (e) {
       throw Exception('保存今日日记失败: $e');
+    }
+  }
+
+  /// 检查今日记录是否可编辑
+  Future<bool> isTodayEditable() async {
+    try {
+      final today = DateTime.now();
+      return await _databaseService.isDateEditable(today);
+    } catch (e) {
+      throw Exception('检查今日编辑状态失败: $e');
+    }
+  }
+
+  /// 获取指定日期的日记
+  Future<Diary?> getDiaryByDate(DateTime date) async {
+    try {
+      return await _databaseService.getDiaryByDate(date);
+    } catch (e) {
+      throw Exception('获取指定日期日记失败: $e');
+    }
+  }
+
+  /// 获取所有日记
+  Future<List<Diary>> getAllDiaries() async {
+    try {
+      return await _databaseService.getAllDiaries();
+    } catch (e) {
+      throw Exception('获取所有日记失败: $e');
     }
   }
 

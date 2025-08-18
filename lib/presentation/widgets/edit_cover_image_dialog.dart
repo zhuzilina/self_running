@@ -148,12 +148,7 @@ class _EditCoverImageDialogState extends ConsumerState<EditCoverImageDialog> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
-      final XFile? image = await _picker.pickImage(
-        source: source,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
-      );
+      final XFile? image = await _picker.pickImage(source: source);
 
       if (image != null) {
         final bytes = await image.readAsBytes();

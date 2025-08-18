@@ -1,9 +1,10 @@
 import 'audio_file.dart';
+import 'image_info.dart';
 
 class Diary {
   final String id;
   final String content;
-  final List<String> imagePaths;
+  final List<ImageInfo> images; // 使用ImageInfo列表
   final List<AudioFile> audioFiles; // 使用新的AudioFile模型
   final DateTime date;
   final DateTime createdAt;
@@ -13,7 +14,7 @@ class Diary {
   Diary({
     required this.id,
     required this.content,
-    this.imagePaths = const [],
+    this.images = const [], // 使用ImageInfo列表
     this.audioFiles = const [], // 使用AudioFile列表
     required this.date,
     required this.createdAt,
@@ -24,7 +25,7 @@ class Diary {
   factory Diary.create({
     required String content,
     required DateTime date,
-    List<String> imagePaths = const [],
+    List<ImageInfo> images = const [],
     List<AudioFile> audioFiles = const [], // 使用AudioFile列表
     bool isEditable = true,
   }) {
@@ -32,7 +33,7 @@ class Diary {
     return Diary(
       id: '${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}', // 使用YYYYMMDD格式
       content: content,
-      imagePaths: imagePaths,
+      images: images,
       audioFiles: audioFiles,
       date: date,
       createdAt: now,
@@ -43,7 +44,7 @@ class Diary {
 
   Diary copyWith({
     String? content,
-    List<String>? imagePaths,
+    List<ImageInfo>? images,
     List<AudioFile>? audioFiles, // 使用AudioFile列表
     DateTime? updatedAt,
     bool? isEditable,
@@ -51,7 +52,7 @@ class Diary {
     return Diary(
       id: id,
       content: content ?? this.content,
-      imagePaths: imagePaths ?? this.imagePaths,
+      images: images ?? this.images,
       audioFiles: audioFiles ?? this.audioFiles,
       date: date,
       createdAt: createdAt,
@@ -64,7 +65,9 @@ class Diary {
     return {
       'id': id,
       'content': content,
-      'imagePaths': imagePaths,
+      'images': images
+          .map((image) => image.toJson())
+          .toList(), // 序列化ImageInfo列表
       'audioFiles': audioFiles
           .map((audio) => audio.toJson())
           .toList(), // 序列化AudioFile列表
@@ -79,7 +82,12 @@ class Diary {
     return Diary(
       id: json['id'] as String,
       content: json['content'] as String,
-      imagePaths: List<String>.from(json['imagePaths'] ?? []),
+      images: (json['images'] as List<dynamic>? ?? [])
+          .map(
+            (imageJson) =>
+                ImageInfo.fromJson(imageJson as Map<String, dynamic>),
+          )
+          .toList(), // 反序列化ImageInfo列表
       audioFiles: (json['audioFiles'] as List<dynamic>? ?? [])
           .map(
             (audioJson) =>
@@ -106,4 +114,12 @@ class Diary {
   // 兼容性方法：获取音频时长列表
   List<int> get audioDurations =>
       audioFiles.map((audio) => audio.duration).toList();
+
+  // 兼容性方法：获取图片路径列表（原图）
+  List<String> get imagePaths =>
+      images.map((image) => image.originalPath).toList();
+
+  // 兼容性方法：获取缩略图路径列表
+  List<String> get thumbnailPaths =>
+      images.map((image) => image.thumbnailPath).toList();
 }

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/daily_steps.dart';
+import '../../data/models/user_daily_data.dart';
 import '../states/providers.dart';
 import '../widgets/ranking_cover_widget.dart';
 
@@ -10,20 +11,20 @@ class RankingPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dailyAsync = ref.watch(dailyStepsProvider);
+    final userDataAsync = ref.watch(userDailyDataRankingProvider);
     final profileAsync = ref.watch(userProfileProvider);
     final screenHeight = MediaQuery.of(context).size.height;
     final coverHeight = screenHeight * 0.45; // 45%的屏幕高度
 
-    return dailyAsync.when(
+    return userDataAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('加载失败：$e')),
-      data: (data) {
+      data: (userDataList) {
         return profileAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text('加载失败：$e')),
           data: (profile) {
-            return _buildRankingList(data, coverHeight, profile);
+            return _buildRankingList(userDataList, coverHeight, profile);
           },
         );
       },
@@ -31,15 +32,22 @@ class RankingPage extends ConsumerWidget {
   }
 
   Widget _buildRankingList(
-    List<DailySteps> data,
+    List<UserDailyData> userDataList,
     double coverHeight,
     dynamic profile,
   ) {
-    // 去掉数量判断，即使只有一天的数据也应该显示排行
+    // 添加调试信息
+    print('RankingPage: 加载到 ${userDataList.length} 条用户数据');
+    for (final data in userDataList) {
+      print('RankingPage: ${data.date} - ${data.nickname} - ${data.steps} 步');
+    }
 
-    final sorted = List<DailySteps>.from(data)
+    // 按步数排序，步数多的在前面
+    final sorted = List<UserDailyData>.from(userDataList)
       ..sort((b, a) => a.steps - b.steps);
-    final today = data.isNotEmpty ? data.last : null;
+
+    // 获取今日数据（最新的数据）
+    final today = userDataList.isNotEmpty ? userDataList.first : null;
 
     return ListView(
       padding: EdgeInsets.zero,
@@ -52,8 +60,42 @@ class RankingPage extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             children: [
+              // 调试信息卡片（仅在开发模式下显示）
+              if (userDataList.isEmpty) ...[
+                Container(
+                  margin: const EdgeInsets.only(top: 16, bottom: 8),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade100,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.orange.shade300),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        '暂无排行数据',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange.shade800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '请先设置今日数据，数据将显示在这里',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.orange.shade700,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               // 用户信息卡片
-              if (data.isNotEmpty && today != null) ...[
+              if (userDataList.isNotEmpty && today != null) ...[
                 Container(
                   margin: const EdgeInsets.only(top: 16, bottom: 8),
                   padding: const EdgeInsets.all(20),
@@ -72,54 +114,60 @@ class RankingPage extends ConsumerWidget {
                     children: [
                       // 用户头像
                       CircleAvatar(
-                        radius: 30,
+                        radius: 25,
                         backgroundColor: Colors.transparent,
-                        child: profile.avatar != null
+                        child: today.avatarPath != null
                             ? ClipOval(
-                                child: _buildAvatarImage(profile.avatar!),
+                                child: _buildAvatarImage(today.avatarPath!),
                               )
-                            : const Icon(Icons.person, size: 30),
+                            : const Icon(Icons.person, size: 25),
                       ),
                       const SizedBox(width: 16),
                       // 用户信息
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             // 用户昵称
                             Text(
-                              profile.nickname,
+                              today.nickname,
                               style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
                                 color: Colors.black87,
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            // 今日步数
+                            const SizedBox(height: 4),
                             Text(
-                              _formatSteps(today.steps),
+                              today.slogan,
                               style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: today.steps >= 10000
-                                    ? FontWeight.bold
-                                    : FontWeight.w600,
-                                color: today.steps >= 10000
-                                    ? Colors.black
-                                    : Colors.grey.shade600,
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                                fontStyle: FontStyle.italic,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
-                      // 排名信息
-                      Text(
-                        '${_getTodayRank(sorted, today)}',
-                        style: TextStyle(
-                          color: Colors.grey.shade700,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Column(
+                        children: [
+                          // 今日步数
+                          Text(
+                            _formatSteps(today.steps),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: today.steps >= 10000
+                                  ? FontWeight.bold
+                                  : FontWeight.w600,
+                              color: today.steps >= 10000
+                                  ? Colors.black
+                                  : Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -133,9 +181,7 @@ class RankingPage extends ConsumerWidget {
               ],
 
               // 排行列表
-              ...sorted.map((d) {
-                final rank = sorted.indexOf(d) + 1;
-
+              ...sorted.map((userData) {
                 return Container(
                   padding: const EdgeInsets.symmetric(
                     vertical: 16,
@@ -155,9 +201,11 @@ class RankingPage extends ConsumerWidget {
                           CircleAvatar(
                             radius: 25,
                             backgroundColor: Colors.blue.shade100,
-                            child: profile.avatar != null
+                            child: userData.avatarPath != null
                                 ? ClipOval(
-                                    child: _buildAvatarImage(profile.avatar!),
+                                    child: _buildAvatarImage(
+                                      userData.avatarPath!,
+                                    ),
                                   )
                                 : const Icon(Icons.person, size: 25),
                           ),
@@ -171,7 +219,7 @@ class RankingPage extends ConsumerWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              profile.nickname,
+                              userData.nickname,
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -180,7 +228,7 @@ class RankingPage extends ConsumerWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              profile.slogan,
+                              userData.slogan,
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey.shade600,
@@ -191,7 +239,7 @@ class RankingPage extends ConsumerWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${d.localDay.year}-${d.localDay.month.toString().padLeft(2, '0')}-${d.localDay.day.toString().padLeft(2, '0')}',
+                              '${userData.date.year}-${userData.date.month.toString().padLeft(2, '0')}-${userData.date.day.toString().padLeft(2, '0')}',
                               style: TextStyle(
                                 color: Colors.grey.shade500,
                                 fontSize: 12,
@@ -207,31 +255,15 @@ class RankingPage extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
-                            _formatSteps(d.steps),
+                            _formatSteps(userData.steps),
                             style: TextStyle(
                               fontSize: 16,
-                              fontWeight: d.steps >= 10000
+                              fontWeight: userData.steps >= 10000
                                   ? FontWeight.bold
                                   : FontWeight.w600,
-                              color: d.steps >= 10000
+                              color: userData.steps >= 10000
                                   ? Colors.black
                                   : Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(width: 20),
-                      // 排名列
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            '$rank',
-                            style: TextStyle(
-                              color: Colors.grey.shade700,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
@@ -286,10 +318,5 @@ class RankingPage extends ConsumerWidget {
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match match) => '${match[1]},',
     );
-  }
-
-  int _getTodayRank(List<DailySteps> sorted, DailySteps today) {
-    final todayIndex = sorted.indexWhere((d) => d.localDay == today.localDay);
-    return todayIndex >= 0 ? todayIndex + 1 : 0;
   }
 }

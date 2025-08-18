@@ -1,0 +1,1160 @@
+import 'dart:io';
+import 'dart:async';
+import 'dart:math';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:percent_indicator/percent_indicator.dart';
+import 'package:photo_view/photo_view.dart';
+import 'package:photo_view/photo_view_gallery.dart';
+import 'package:audioplayers/audioplayers.dart';
+
+import '../../data/models/diary.dart';
+import '../../data/models/audio_file.dart';
+import '../../data/models/user_daily_data.dart';
+import '../../data/models/user_profile.dart';
+import '../../presentation/states/providers.dart';
+import '../../services/pinned_diary_service.dart';
+
+/// 日记内容查看浮窗
+class DiaryContentDialog extends StatelessWidget {
+  final String content;
+  final String title;
+
+  const DiaryContentDialog({
+    super.key,
+    required this.content,
+    required this.title,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.3,
+      maxChildSize: 0.9,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Column(
+            children: [
+              // 拖拽指示器
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // 标题
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                      iconSize: 20,
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // 内容
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    content,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      height: 1.6,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 裁切文本组件
+class TruncatedText extends StatelessWidget {
+  final String text;
+  final int maxLines;
+  final TextStyle? style;
+  final String title;
+
+  const TruncatedText({
+    super.key,
+    required this.text,
+    required this.maxLines,
+    this.style,
+    required this.title,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 使用简单的文本长度估算，避免TextDirection问题
+        final textStyle = style ?? const TextStyle(fontSize: 16, height: 1.6);
+        final estimatedCharsPerLine = (constraints.maxWidth / 12)
+            .floor(); // 估算每行字符数
+        final estimatedLines = (text.length / estimatedCharsPerLine).ceil();
+
+        // 检查是否需要截断
+        if (estimatedLines > maxLines) {
+          // 文本被裁切，显示"查看更多"
+          return GestureDetector(
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) =>
+                    DiaryContentDialog(content: text, title: title),
+              );
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  text,
+                  style: textStyle,
+                  maxLines: maxLines,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '查看更多',
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          );
+        } else {
+          // 文本未超出，直接显示
+          return Text(text, style: textStyle);
+        }
+      },
+    );
+  }
+}
+
+class DiaryDetailPage extends ConsumerStatefulWidget {
+  final Diary diary;
+  final List<Diary>? allDiaries;
+  final int initialIndex;
+
+  const DiaryDetailPage({
+    super.key,
+    required this.diary,
+    this.allDiaries,
+    this.initialIndex = 0,
+  });
+
+  @override
+  ConsumerState<DiaryDetailPage> createState() => _DiaryDetailPageState();
+}
+
+class _DiaryDetailPageState extends ConsumerState<DiaryDetailPage> {
+  late PageController _pageController;
+  int _currentDiaryIndex = 0;
+  int _currentPage = 0; // 图片轮播的当前页
+
+  @override
+  void initState() {
+    super.initState();
+    // 添加调试信息
+    print('🚀 DiaryDetailPage 初始化:');
+    print('  - allDiaries 数量: ${widget.allDiaries?.length ?? 0}');
+    print('  - initialIndex: ${widget.initialIndex}');
+
+    // 安全检查初始索引
+    if (widget.allDiaries != null && widget.allDiaries!.isNotEmpty) {
+      _currentDiaryIndex = widget.initialIndex.clamp(
+        0,
+        widget.allDiaries!.length - 1,
+      );
+      print('  - 设置初始页面索引: $_currentDiaryIndex');
+    } else {
+      _currentDiaryIndex = 0;
+      print('  - 使用默认页面索引: $_currentDiaryIndex');
+    }
+    _pageController = PageController(initialPage: _currentDiaryIndex);
+    print('  ✅ 初始化完成');
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  // 格式化步数显示，添加千分隔符
+  String _formatSteps(int steps) {
+    return steps.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match match) => '${match[1]},',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 如果没有allDiaries，显示单页
+    if (widget.allDiaries == null || widget.allDiaries!.isEmpty) {
+      return Scaffold(
+        appBar: _buildAppBar(),
+        body: _buildDiaryContent(widget.diary),
+      );
+    }
+
+    // 使用PageView显示多页
+    return Scaffold(
+      appBar: _buildAppBar(),
+      body: PageView.builder(
+        controller: _pageController,
+        scrollDirection: Axis.vertical,
+        itemCount: widget.allDiaries!.length,
+        onPageChanged: (index) {
+          setState(() {
+            _currentDiaryIndex = index;
+          });
+          print('📄 PageView 页面切换:');
+          print('  - 从页面: $_currentDiaryIndex');
+          print('  - 到页面: $index');
+          print('  - 总页面数: ${widget.allDiaries!.length}');
+          print('  ✅ 页面切换成功');
+        },
+        itemBuilder: (context, index) {
+          final diary = widget.allDiaries![index];
+          return _buildDiaryContent(diary);
+        },
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.black),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+      title: Consumer(
+        builder: (context, ref, child) {
+          final userProfileAsync = ref.watch(userProfileProvider);
+          final userDataAsync = ref.watch(userDailyDataRankingProvider);
+
+          return userProfileAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (userProfile) => userDataAsync.when(
+              loading: () => Row(
+                children: [
+                  // 用户头像
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: Colors.grey[200],
+                    backgroundImage: userProfile.avatar != null
+                        ? AssetImage(userProfile.avatar!)
+                        : null,
+                    child: userProfile.avatar == null
+                        ? Text(
+                            userProfile.nickname.isNotEmpty
+                                ? userProfile.nickname[0]
+                                : '?',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 8),
+                  // 用户昵称
+                  Expanded(
+                    child: Text(
+                      userProfile.nickname,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              error: (_, __) => Row(
+                children: [
+                  // 用户头像
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: Colors.grey[200],
+                    backgroundImage: userProfile.avatar != null
+                        ? AssetImage(userProfile.avatar!)
+                        : null,
+                    child: userProfile.avatar == null
+                        ? Text(
+                            userProfile.nickname.isNotEmpty
+                                ? userProfile.nickname[0]
+                                : '?',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 8),
+                  // 用户昵称
+                  Expanded(
+                    child: Text(
+                      userProfile.nickname,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              data: (userDataList) {
+                // 获取当前用户的步数数据
+                int currentSteps = 0;
+                if (userDataList.isNotEmpty) {
+                  currentSteps = userDataList.first.steps;
+                }
+
+                return Row(
+                  children: [
+                    // 用户头像
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.grey[200],
+                      backgroundImage: userProfile.avatar != null
+                          ? AssetImage(userProfile.avatar!)
+                          : null,
+                      child: userProfile.avatar == null
+                          ? Text(
+                              userProfile.nickname.isNotEmpty
+                                  ? userProfile.nickname[0]
+                                  : '?',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey,
+                              ),
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 8),
+                    // 用户昵称
+                    Expanded(
+                      child: Text(
+                        userProfile.nickname,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // 步数显示
+                    Text(
+                      _formatSteps(currentSteps),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDiaryContent(Diary diary) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 轮播图（如果有图片）
+          if (diary.images.isNotEmpty) ...[
+            _buildImageCarousel(
+              diary.images.map((img) => img.originalPath).toList(),
+            ),
+            const SizedBox(height: 20),
+          ],
+
+          // 用户slogan
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: Consumer(
+              builder: (context, ref, child) {
+                final userDataAsync = ref.watch(userDailyDataRankingProvider);
+                return userDataAsync.when(
+                  loading: () => const SizedBox.shrink(),
+                  error: (error, stack) => const SizedBox.shrink(),
+                  data: (userDataList) {
+                    // 查找与日记日期对应的用户数据
+                    UserDailyData? userData;
+                    try {
+                      userData = userDataList.firstWhere(
+                        (data) =>
+                            data.date.year == diary.date.year &&
+                            data.date.month == diary.date.month &&
+                            data.date.day == diary.date.day,
+                      );
+                    } catch (e) {
+                      userData = userDataList.isNotEmpty
+                          ? userDataList.first
+                          : null;
+                    }
+
+                    if (userData?.slogan == null || userData!.slogan.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              userData.slogan,
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[600],
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                        ),
+                        // 置顶按钮
+                        Consumer(
+                          builder: (context, ref, child) {
+                            final pinnedDiariesAsync = ref.watch(
+                              pinnedDiariesProvider,
+                            );
+                            return pinnedDiariesAsync.when(
+                              loading: () => Text(
+                                '置顶',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              error: (_, __) => Text(
+                                '置顶',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              data: (pinnedDiaries) {
+                                final isPinned = pinnedDiaries.any(
+                                  (diaryItem) => diaryItem.id == diary.id,
+                                );
+                                return GestureDetector(
+                                  onTap: () async {
+                                    final service = ref.read(
+                                      pinnedDiaryServiceProvider,
+                                    );
+                                    await service.init();
+
+                                    if (isPinned) {
+                                      await service.unpinDiary(
+                                        int.tryParse(diary.id) ?? 0,
+                                      );
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('已取消置顶'),
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    } else {
+                                      await service.pinDiary(
+                                        int.tryParse(diary.id) ?? 0,
+                                      );
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text('已将日记置顶'),
+                                          duration: const Duration(seconds: 2),
+                                        ),
+                                      );
+                                    }
+
+                                    // 刷新置顶列表
+                                    ref.invalidate(pinnedDiariesProvider);
+                                  },
+                                  child: Text(
+                                    isPinned ? '取消置顶' : '置顶',
+                                    style: TextStyle(
+                                      color: isPinned
+                                          ? Colors.grey[600]
+                                          : Colors.black,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+
+          // 日期信息
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: Row(
+              children: [
+                Text(
+                  DateFormat('yyyy年MM月dd日').format(diary.date),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  DateFormat('EEEE').format(diary.date),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                ),
+                const Spacer(),
+                if (diary.updatedAt != null)
+                  Text(
+                    '更新于 ${DateFormat('HH:mm').format(diary.updatedAt!)}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                  ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // 音频文件区域（如果有音频）
+          if (diary.audioFiles.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: _buildAudioSection(diary.audioFiles),
+            ),
+            const SizedBox(height: 20),
+          ],
+
+          // 分割线（始终显示）
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: Divider(height: 1, thickness: 1, color: Colors.grey[300]),
+          ),
+          const SizedBox(height: 20),
+
+          // 正文部分
+          if (diary.content.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: TruncatedText(
+                text: diary.content,
+                maxLines: 5,
+                title: '日记内容',
+              ),
+            ),
+          ],
+
+          // 锁定状态
+          if (!diary.isEditable) ...[
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.orange[200]!),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.lock, size: 16, color: Colors.orange[700]),
+                    const SizedBox(width: 6),
+                    Text(
+                      '已锁定',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageCarousel(List<String> imagePaths) {
+    return Container(
+      height: 300,
+      child: Stack(
+        children: [
+          PageView.builder(
+            itemCount: imagePaths.length,
+            onPageChanged: (index) {
+              setState(() {
+                _currentPage = index;
+              });
+            },
+            itemBuilder: (context, index) {
+              return GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ImagePreviewPage(
+                        imagePaths: imagePaths,
+                        initialIndex: index,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  color: Colors.grey[200],
+                  child: FutureBuilder<File>(
+                    future: Future.value(File(imagePaths[index])),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData && snapshot.data!.existsSync()) {
+                        final file = snapshot.data!;
+                        return Image.file(
+                          file,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                          filterQuality: FilterQuality.high,
+                          errorBuilder: (context, error, stackTrace) {
+                            print('图片加载错误: $error');
+                            print('图片路径: ${file.path}');
+                            return Container(
+                              color: Colors.grey[200],
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.image,
+                                    color: Colors.grey,
+                                    size: 50,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '图片加载失败',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      } else {
+                        return Container(
+                          color: Colors.grey[200],
+                          child: const Icon(
+                            Icons.image,
+                            color: Colors.grey,
+                            size: 50,
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+          // 右上角指示器文字
+          Positioned(
+            top: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${_currentPage + 1}/${imagePaths.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAudioSection(List<AudioFile> audioFiles) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 两行横向瀑布流布局
+        Container(
+          height: 80, // 两行高度：32px * 2 + 间距
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal, // 横向滚动
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 第一行
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: audioFiles
+                      .asMap()
+                      .entries
+                      .where((entry) => entry.key.isEven)
+                      .map((entry) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4, bottom: 4),
+                          child: _buildAudioItem(entry.value),
+                        );
+                      })
+                      .toList(),
+                ),
+                // 第二行
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: audioFiles
+                      .asMap()
+                      .entries
+                      .where((entry) => entry.key.isOdd)
+                      .map((entry) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4, top: 4),
+                          child: _buildAudioItem(entry.value),
+                        );
+                      })
+                      .toList(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAudioItem(AudioFile audioFile) {
+    return AudioPlayerWidget(audioFile: audioFile);
+  }
+}
+
+class ImagePreviewPage extends StatefulWidget {
+  final List<String> imagePaths;
+  final int initialIndex;
+
+  const ImagePreviewPage({
+    super.key,
+    required this.imagePaths,
+    required this.initialIndex,
+  });
+
+  @override
+  State<ImagePreviewPage> createState() => _ImagePreviewPageState();
+}
+
+class _ImagePreviewPageState extends State<ImagePreviewPage> {
+  late PageController _pageController;
+  late int _currentIndex;
+  bool _showControls = true;
+  final Map<int, PhotoViewController> _photoViewControllers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+
+    // 为每个图片创建PhotoViewController
+    for (int i = 0; i < widget.imagePaths.length; i++) {
+      _photoViewControllers[i] = PhotoViewController();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    // 释放所有PhotoViewController
+    for (var controller in _photoViewControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _onPageChanged(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // 图片轮播
+          PhotoViewGallery.builder(
+            scrollPhysics: const BouncingScrollPhysics(),
+            builder: (BuildContext context, int index) {
+              return PhotoViewGalleryPageOptions(
+                imageProvider: FileImage(File(widget.imagePaths[index])),
+                initialScale: PhotoViewComputedScale.contained,
+                minScale: PhotoViewComputedScale.contained * 0.8,
+                maxScale: PhotoViewComputedScale.covered * 2.0,
+                heroAttributes: PhotoViewHeroAttributes(
+                  tag: widget.imagePaths[index],
+                ),
+                controller: _photoViewControllers[index],
+                onTapUp: (_, __, ___) {
+                  setState(() {
+                    _showControls = !_showControls;
+                  });
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  print('图片预览加载错误: $error');
+                  print('图片路径: ${widget.imagePaths[index]}');
+                  return Container(
+                    color: Colors.black,
+                    child: const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.image, color: Colors.white, size: 50),
+                          SizedBox(height: 16),
+                          Text(
+                            '图片加载失败',
+                            style: TextStyle(color: Colors.white, fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+            itemCount: widget.imagePaths.length,
+            loadingBuilder: (context, event) => const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+            pageController: _pageController,
+            onPageChanged: _onPageChanged,
+          ),
+          // 控制栏
+          if (_showControls)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.only(
+                  top: 50,
+                  left: 16,
+                  right: 16,
+                  bottom: 16,
+                ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.black.withOpacity(0.7), Colors.transparent],
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${_currentIndex + 1}/${widget.imagePaths.length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 音频播放器管理器（单例模式）
+class AudioPlayerManager {
+  static final AudioPlayerManager _instance = AudioPlayerManager._internal();
+  factory AudioPlayerManager() => _instance;
+  AudioPlayerManager._internal();
+
+  final Set<_AudioPlayerWidgetState> _activePlayers = {};
+
+  void registerPlayer(_AudioPlayerWidgetState player) {
+    _activePlayers.add(player);
+  }
+
+  void unregisterPlayer(_AudioPlayerWidgetState player) {
+    _activePlayers.remove(player);
+  }
+
+  void stopOtherPlayers(_AudioPlayerWidgetState currentPlayer) {
+    for (final player in _activePlayers) {
+      if (player != currentPlayer) {
+        player.stopAndReset();
+      }
+    }
+  }
+}
+
+/// 音频播放器组件
+class AudioPlayerWidget extends StatefulWidget {
+  final AudioFile audioFile;
+
+  const AudioPlayerWidget({super.key, required this.audioFile});
+
+  @override
+  State<AudioPlayerWidget> createState() => _AudioPlayerWidgetState();
+}
+
+class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
+  AudioPlayer? _audioPlayer;
+  bool _isPlaying = false;
+  Duration _currentPosition = Duration.zero;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer = AudioPlayer();
+    AudioPlayerManager().registerPlayer(this);
+
+    _audioPlayer!.onPlayerComplete.listen((_) {
+      setState(() {
+        _isPlaying = false;
+        _currentPosition = Duration.zero;
+      });
+      _timer?.cancel();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _audioPlayer?.dispose();
+    AudioPlayerManager().unregisterPlayer(this);
+    super.dispose();
+  }
+
+  void stopAndReset() {
+    _audioPlayer?.stop();
+    setState(() {
+      _isPlaying = false;
+      _currentPosition = Duration.zero;
+    });
+    _timer?.cancel();
+  }
+
+  void _togglePlay() async {
+    if (_isPlaying) {
+      // 暂停播放
+      await _audioPlayer?.pause();
+      setState(() {
+        _isPlaying = false;
+      });
+      _timer?.cancel();
+    } else {
+      // 开始播放
+      AudioPlayerManager().stopOtherPlayers(this);
+
+      if (_currentPosition.inMilliseconds >= widget.audioFile.duration ||
+          _currentPosition.inMilliseconds == 0) {
+        // 重新开始播放
+        await _audioPlayer?.setSource(
+          DeviceFileSource(widget.audioFile.filePath),
+        );
+        await _audioPlayer?.resume();
+        setState(() {
+          _isPlaying = true;
+          _currentPosition = Duration.zero;
+        });
+      } else {
+        // 继续播放
+        await _audioPlayer?.resume();
+        setState(() {
+          _isPlaying = true;
+        });
+      }
+
+      // 启动定时器更新进度
+      _timer = Timer.periodic(const Duration(milliseconds: 150), (timer) {
+        if (_isPlaying) {
+          setState(() {
+            _currentPosition += const Duration(milliseconds: 150);
+          });
+        }
+      });
+    }
+  }
+
+  // 根据音频时长计算宽度
+  double _calculateWidth() {
+    final durationSeconds = widget.audioFile.duration / 1000;
+    const minWidth = 120.0; // 最小宽度：能装下6个字符 + 播放图标 + 间距
+    const maxWidth = 200.0; // 最大宽度
+    const minDuration = 1.0; // 最小时长（1秒）
+    const maxDuration = 120.0; // 最大时长（2分钟）
+
+    // 线性插值计算宽度
+    final ratio = (durationSeconds - minDuration) / (maxDuration - minDuration);
+    final clampedRatio = ratio.clamp(0.0, 1.0);
+
+    return minWidth + (maxWidth - minWidth) * clampedRatio;
+  }
+
+  Widget _buildDefaultView() {
+    if (_isPlaying) {
+      return const SizedBox.shrink(); // 播放时隐藏图标和文字
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.play_arrow, size: 16, color: Colors.grey[600]),
+        const SizedBox(width: 4),
+        Text(
+          widget.audioFile.displayName,
+          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress =
+        _currentPosition.inMilliseconds / widget.audioFile.duration;
+    final width = _calculateWidth();
+
+    return GestureDetector(
+      onTap: _togglePlay,
+      child: Container(
+        width: width,
+        height: 32,
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: Stack(
+          children: [
+            // 进度条
+            if (_isPlaying)
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: LinearPercentIndicator(
+                    width: width - 2,
+                    lineHeight: 32,
+                    percent: progress.clamp(0.0, 1.0),
+                    progressColor: Colors.grey[400]!,
+                    backgroundColor: Colors.transparent,
+                    barRadius: const Radius.circular(16),
+                    animation: false,
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+            // 内容
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: _buildDefaultView(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

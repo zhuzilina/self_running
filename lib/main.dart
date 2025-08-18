@@ -11,78 +11,52 @@ import 'services/sensor_steps_service.dart';
 import 'services/background_steps_service.dart';
 import 'services/daily_steps_base_service.dart';
 import 'data/models/daily_steps_base.dart';
+import 'services/storage_service.dart';
+import 'services/user_profile_service.dart';
+import 'services/health_data_sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 初始化Hive
   await Hive.initFlutter();
+
   Hive.registerAdapter(DailyStepsBaseAdapter());
 
-  // 初始化数据库
-  await DatabaseService().database;
-
-  // 初始化数据管理服务
   try {
+    // 初始化存储服务
+    final storageService = StorageService();
+    await storageService.init();
+
+    // 初始化数据库服务
+    final databaseService = DatabaseService();
+    await databaseService.database; // 使用database getter初始化
+
+    // 初始化用户配置服务
+    final userProfileService = UserProfileService(storageService);
+    await userProfileService.init();
+
+    // 初始化健康数据同步服务
+    final healthDataSyncService = HealthDataSyncService(
+      storageService: storageService,
+      databaseService: databaseService,
+      userProfileService: userProfileService,
+    );
+
+    // 初始化数据初始化服务
     final dataInitService = DataInitializationService();
-    await dataInitService.init();
+    dataInitService.initialize(
+      databaseService: databaseService,
+      userProfileService: userProfileService,
+      healthDataSyncService: healthDataSyncService,
+    );
+
+    // 初始化今日数据
     await dataInitService.initializeTodayData();
-    print('数据初始化完成');
+
+    runApp(const ProviderScope(child: App()));
   } catch (e) {
-    print('数据初始化失败: $e');
+    print('应用初始化失败: $e');
+    runApp(const ProviderScope(child: App()));
   }
-
-  // 初始化统一健康服务
-  try {
-    final unifiedHealthService = UnifiedHealthService();
-    await unifiedHealthService.initialize();
-
-    final dataSource = unifiedHealthService.getCurrentDataSource();
-    print('Current health data source: $dataSource');
-
-    if (dataSource != HealthDataSource.none) {
-      final granted = await unifiedHealthService.requestPermissions();
-      print('Health permissions requested on startup: $granted');
-    }
-  } catch (e) {
-    print('Error initializing unified health service: $e');
-  }
-
-  // 初始化实时步数服务
-  try {
-    final realtimeStepsService = RealtimeStepsService();
-    await realtimeStepsService.initialize();
-    print('Realtime steps service initialized successfully');
-  } catch (e) {
-    print('Error initializing realtime steps service: $e');
-  }
-
-  // 初始化传感器步数服务
-  try {
-    final sensorStepsService = SensorStepsService();
-    await sensorStepsService.initialize();
-    print('Sensor steps service initialized successfully');
-  } catch (e) {
-    print('Error initializing sensor steps service: $e');
-  }
-
-  // 初始化步数基数服务
-  try {
-    final dailyStepsBaseService = DailyStepsBaseService();
-    await dailyStepsBaseService.init();
-    print('Daily steps base service initialized successfully');
-  } catch (e) {
-    print('Error initializing daily steps base service: $e');
-  }
-
-  // 初始化后台步数服务（WorkManager）
-  try {
-    final backgroundStepsService = BackgroundStepsService();
-    await backgroundStepsService.initialize();
-    print('Background steps service initialized successfully');
-  } catch (e) {
-    print('Error initializing background steps service: $e');
-  }
-
-  runApp(const ProviderScope(child: App()));
 }

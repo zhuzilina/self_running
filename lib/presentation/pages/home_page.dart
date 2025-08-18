@@ -40,38 +40,47 @@ class _HomePageState extends ConsumerState<HomePage> {
       const StatsPage(),
     ];
     return Scaffold(
-      extendBodyBehindAppBar: true, // 让body延伸到AppBar后面
+      extendBodyBehindAppBar: _index != 2, // 只有在第三屏时不延伸到AppBar后面
       backgroundColor: Colors.white, // 设置整体背景为白色
-      appBar: AppBar(
-        backgroundColor: Colors.transparent, // 完全透明背景
-        elevation: 0, // 去掉阴影
-        title: const Text(''), // 去掉标题
-        surfaceTintColor: Colors.transparent, // 移除Material 3的表面色调
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+      appBar: _index == 2
+          ? null
+          : AppBar(
+              // 第三屏不显示AppBar
+              backgroundColor: Colors.transparent, // 完全透明背景
+              elevation: 0, // 去掉阴影
+              title: const Text(''), // 去掉标题
+              surfaceTintColor: Colors.transparent, // 移除Material 3的表面色调
+              actions: [
+                Container(
+                  margin: const EdgeInsets.only(right: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.settings,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const SettingsPage(),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
-            child: IconButton(
-              icon: const Icon(Icons.settings, color: Colors.white, size: 24),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const SettingsPage()),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
       body: pages[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
@@ -79,7 +88,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.today), label: '主页'),
           NavigationDestination(icon: Icon(Icons.leaderboard), label: '排行'),
-          NavigationDestination(icon: Icon(Icons.insights), label: '统计'),
+          NavigationDestination(icon: Icon(Icons.history), label: '足迹'),
         ],
       ),
     );
@@ -291,7 +300,7 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
-                                              '今日记录已锁定，无法编辑',
+                                              '过去的记忆已锁定，无法编辑哦',
                                               style: TextStyle(
                                                 color: Colors.grey.shade600,
                                               ),

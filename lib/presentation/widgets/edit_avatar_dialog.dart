@@ -126,12 +126,7 @@ class _EditAvatarDialogState extends ConsumerState<EditAvatarDialog> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
-      final XFile? image = await _picker.pickImage(
-        source: source,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 90,
-      );
+      final XFile? image = await _picker.pickImage(source: source);
 
       if (image != null) {
         // 进入裁剪页面

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:image/image.dart' as img;
 
 class FileStorageService {
   static FileStorageService? _instance;
@@ -42,6 +43,17 @@ class FileStorageService {
     return imagesDir;
   }
 
+  /// 获取缩略图存储目录（按日期组织）
+  /// 目录结构: /data/20250816/thumbnails/
+  Future<Directory> getThumbnailsDirectory(String dateId) async {
+    final dateDir = await _getDateDirectory(dateId);
+    final thumbnailsDir = Directory(join(dateDir.path, 'thumbnails'));
+    if (!await thumbnailsDir.exists()) {
+      await thumbnailsDir.create(recursive: true);
+    }
+    return thumbnailsDir;
+  }
+
   /// 获取音频存储目录（按日期组织）
   /// 目录结构: /data/20250816/audio/
   Future<Directory> getAudioDirectory(String dateId) async {
@@ -59,7 +71,52 @@ class FileStorageService {
     return '${hash.toString()}.$extension';
   }
 
-  /// 直接保存图片到指定日期的目录
+  /// 生成缩略图
+  Future<File> _generateThumbnail(
+    File originalFile,
+    String thumbPath, {
+    int maxWidth = 300,
+  }) async {
+    final image = img.decodeImage(await originalFile.readAsBytes());
+    if (image == null) throw Exception("无法解码图片");
+
+    final thumbnail = img.copyResize(image, width: maxWidth);
+    final thumbFile = File(thumbPath);
+    await thumbFile.writeAsBytes(img.encodeJpg(thumbnail, quality: 95));
+    return thumbFile;
+  }
+
+  /// 保存图片（原图 + 缩略图）到指定日期的目录
+  /// 返回包含原图和缩略图路径的Map
+  Future<Map<String, String>?> saveImageWithThumbnail(
+    Uint8List imageData,
+    String originalName,
+    String dateId,
+  ) async {
+    try {
+      final imagesDir = await getImagesDirectory(dateId);
+      final thumbnailsDir = await getThumbnailsDirectory(dateId);
+
+      final fileExtension = extension(originalName).replaceAll('.', '');
+      final fileName = _generateHash(imageData, fileExtension);
+
+      // 保存原图
+      final originalPath = join(imagesDir.path, fileName);
+      final originalFile = File(originalPath);
+      await originalFile.writeAsBytes(imageData);
+
+      // 生成并保存缩略图
+      final thumbnailPath = join(thumbnailsDir.path, fileName);
+      await _generateThumbnail(originalFile, thumbnailPath);
+
+      return {'originalPath': originalPath, 'thumbnailPath': thumbnailPath};
+    } catch (e) {
+      print('保存图片和缩略图失败: $e');
+      return null;
+    }
+  }
+
+  /// 直接保存图片到指定日期的目录（兼容旧版本）
   /// 使用MD5 hash文件名保存，确保唯一性
   Future<String?> saveImageDirectly(
     Uint8List imageData,
@@ -132,10 +189,14 @@ class FileStorageService {
   ) async {
     try {
       final imagesDir = await getImagesDirectory(dateId);
+      final thumbnailsDir = await getThumbnailsDirectory(dateId);
       final audioDir = await getAudioDirectory(dateId);
 
       // 清理图片文件
       await _cleanupDirectory(imagesDir, usedFilePaths);
+
+      // 清理缩略图文件
+      await _cleanupDirectory(thumbnailsDir, usedFilePaths);
 
       // 清理音频文件
       await _cleanupDirectory(audioDir, usedFilePaths);

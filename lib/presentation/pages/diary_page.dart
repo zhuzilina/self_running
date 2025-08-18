@@ -215,11 +215,7 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
     }
 
     try {
-      final List<XFile> pickedFiles = await ImagePicker().pickMultiImage(
-        maxWidth: 512,
-        maxHeight: 512,
-        imageQuality: 80,
-      );
+      final List<XFile> pickedFiles = await ImagePicker().pickMultiImage();
 
       if (pickedFiles.isNotEmpty) {
         final remainingSlots = maxImages - _selectedImages.length;
@@ -611,7 +607,7 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
         // 更新现有日记，保留未删除的音频文件
         final updatedDiary = existingDiary.copyWith(
           content: _textController.text.trim(),
-          imagePaths: [], // 图片会通过saveTodayDiary重新处理
+          images: [], // 图片会通过saveTodayDiary重新处理
           audioFiles: audioFiles,
         );
 
