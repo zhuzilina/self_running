@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../data/models/user_daily_data.dart';
@@ -351,7 +367,10 @@ class DatabaseService {
           )
           .toList();
     } catch (e) {
-      print('反序列化音频文件失败: $e');
+      assert(() {
+        print('反序列化音频文件失败: $e');
+        return true;
+      }());
       audioFiles = [];
     }
 
@@ -373,7 +392,10 @@ class DatabaseService {
           )
           .toList();
     } catch (e) {
-      print('反序列化图片信息失败: $e');
+      assert(() {
+        print('反序列化图片信息失败: $e');
+        return true;
+      }());
       images = [];
     }
 

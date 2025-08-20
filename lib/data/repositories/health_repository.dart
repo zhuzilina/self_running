@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'package:health/health.dart';
 import '../models/daily_steps.dart';
 
@@ -20,10 +36,16 @@ class HealthRepository {
         types,
         permissions: permissions,
       );
-      print('Health permissions granted: $granted');
+      assert(() {
+        print('Health permissions granted: $granted');
+        return true;
+      }());
       return granted;
     } catch (e) {
-      print('Health permissions error: $e');
+      assert(() {
+        print('Health permissions error: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -37,14 +59,26 @@ class HealthRepository {
       // 不再自动请求权限，直接尝试获取数据
       // 如果没有权限，将返回空列表
 
-      print('Requesting health data...');
+      assert(() {
+
+        print('Requesting health data...');
+
+        return true;
+
+      }());
       final raw = await _health.getHealthDataFromTypes(
         types: const [HealthDataType.STEPS],
         startTime: from,
         endTime: to,
       );
 
-      print('Received ${raw.length} health data points');
+      assert(() {
+
+        print('Received ${raw.length} health data points');
+
+        return true;
+
+      }());
       final mapped = raw;
       final Map<DateTime, int> bucket = {};
 
@@ -56,7 +90,10 @@ class HealthRepository {
         );
         final value = (d.value as num?)?.toInt() ?? 0;
         bucket[local] = (bucket[local] ?? 0) + value;
-        print('Health data: ${d.dateFrom} -> $value steps');
+        assert(() {
+          print('Health data: ${d.dateFrom} -> $value steps');
+          return true;
+        }());
       }
 
       final List<DailySteps> list =
@@ -71,10 +108,19 @@ class HealthRepository {
               .toList()
             ..sort((a, b) => a.localDay.compareTo(b.localDay));
 
-      print('Processed ${list.length} daily steps records');
+      assert(() {
+
+        print('Processed ${list.length} daily steps records');
+
+        return true;
+
+      }());
       return list;
     } catch (e) {
-      print('Error fetching health data: $e');
+      assert(() {
+        print('Error fetching health data: $e');
+        return true;
+      }());
       // 在非支持平台或无权限时，容错返回空列表
       return [];
     }

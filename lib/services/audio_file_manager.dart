@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'dart:io';
 import 'dart:async';
 import 'dart:typed_data';
@@ -83,7 +99,10 @@ class AudioFileManager {
       );
 
       if (pendingAudioFile == null) {
-        print('第一阶段失败：无法写入临时文件');
+        assert(() {
+          print('第一阶段失败：无法写入临时文件');
+          return true;
+        }());
         return null;
       }
 
@@ -94,7 +113,10 @@ class AudioFileManager {
       );
 
       if (finalAudioFile == null) {
-        print('第二阶段失败：无法移动到正式目录');
+        assert(() {
+          print('第二阶段失败：无法移动到正式目录');
+          return true;
+        }());
         // 清理临时文件
         await _cleanupPendingFile(pendingAudioFile.filePath);
         return null;
@@ -103,10 +125,19 @@ class AudioFileManager {
       // 更新数据库记录状态为active
       final activeAudioFile = finalAudioFile.markAsActive();
 
-      print('音频文件保存成功: ${activeAudioFile.filePath}');
+      assert(() {
+
+        print('音频文件保存成功: ${activeAudioFile.filePath}');
+
+        return true;
+
+      }());
       return activeAudioFile;
     } catch (e) {
-      print('保存音频文件失败: $e');
+      assert(() {
+        print('保存音频文件失败: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -122,7 +153,10 @@ class AudioFileManager {
     try {
       final sourceFile = File(sourcePath);
       if (!await sourceFile.exists()) {
-        print('源文件不存在: $sourcePath');
+        assert(() {
+          print('源文件不存在: $sourcePath');
+          return true;
+        }());
         return null;
       }
 
@@ -140,13 +174,19 @@ class AudioFileManager {
 
       // 验证写入的文件
       if (!await pendingFile.exists()) {
-        print('临时文件写入失败: $pendingPath');
+        assert(() {
+          print('临时文件写入失败: $pendingPath');
+          return true;
+        }());
         return null;
       }
 
       final pendingFileSize = await pendingFile.length();
       if (pendingFileSize != audioData.length) {
-        print('文件大小不匹配: 期望${audioData.length}, 实际$pendingFileSize');
+        assert(() {
+          print('文件大小不匹配: 期望${audioData.length}, 实际$pendingFileSize');
+          return true;
+        }());
         await pendingFile.delete();
         return null;
       }
@@ -159,7 +199,10 @@ class AudioFileManager {
         recordTime: recordTime,
       );
     } catch (e) {
-      print('写入临时目录失败: $e');
+      assert(() {
+        print('写入临时目录失败: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -172,7 +215,10 @@ class AudioFileManager {
     try {
       final pendingFile = File(pendingAudioFile.filePath);
       if (!await pendingFile.exists()) {
-        print('临时文件不存在: ${pendingAudioFile.filePath}');
+        assert(() {
+          print('临时文件不存在: ${pendingAudioFile.filePath}');
+          return true;
+        }());
         return null;
       }
 
@@ -192,14 +238,20 @@ class AudioFileManager {
 
       // 验证移动后的文件
       if (!await finalFile.exists()) {
-        print('文件移动失败: $finalPath');
+        assert(() {
+          print('文件移动失败: $finalPath');
+          return true;
+        }());
         return null;
       }
 
       // 更新AudioFile对象
       return pendingAudioFile.copyWith(filePath: finalPath);
     } catch (e) {
-      print('移动到正式目录失败: $e');
+      assert(() {
+        print('移动到正式目录失败: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -209,10 +261,16 @@ class AudioFileManager {
     try {
       // 这里应该从数据库获取AudioFile对象
       // 暂时返回true，实际实现需要数据库操作
-      print('标记音频文件为删除状态: $audioFileId');
+      assert(() {
+        print('标记音频文件为删除状态: $audioFileId');
+        return true;
+      }());
       return true;
     } catch (e) {
-      print('标记删除失败: $e');
+      assert(() {
+        print('标记删除失败: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -220,7 +278,10 @@ class AudioFileManager {
   /// 异步清理已删除的文件
   Future<void> cleanupDeletedFiles() async {
     try {
-      print('开始清理已删除的音频文件...');
+      assert(() {
+        print('开始清理已删除的音频文件...');
+        return true;
+      }());
 
       // 获取所有标记为删除的音频文件
       final deletedFiles = await _getDeletedAudioFiles();
@@ -229,9 +290,18 @@ class AudioFileManager {
         await _physicallyDeleteFile(audioFile);
       }
 
-      print('清理完成，处理了${deletedFiles.length}个文件');
+      assert(() {
+
+        print('清理完成，处理了${deletedFiles.length}个文件');
+
+        return true;
+
+      }());
     } catch (e) {
-      print('清理已删除文件失败: $e');
+      assert(() {
+        print('清理已删除文件失败: $e');
+        return true;
+      }());
     }
   }
 
@@ -248,13 +318,19 @@ class AudioFileManager {
       final file = File(audioFile.filePath);
       if (await file.exists()) {
         await file.delete();
-        print('物理删除文件成功: ${audioFile.filePath}');
+        assert(() {
+          print('物理删除文件成功: ${audioFile.filePath}');
+          return true;
+        }());
 
         // 更新数据库记录（删除或标记为已清理）
         await _updateFileAsCleaned(audioFile.id);
       }
     } catch (e) {
-      print('物理删除文件失败: ${audioFile.filePath}, 错误: $e');
+      assert(() {
+        print('物理删除文件失败: ${audioFile.filePath}, 错误: $e');
+        return true;
+      }());
     }
   }
 
@@ -262,7 +338,10 @@ class AudioFileManager {
   Future<void> _updateFileAsCleaned(String audioFileId) async {
     // 这里应该更新数据库记录
     // 可以选择物理删除记录或标记为已清理
-    print('更新文件状态为已清理: $audioFileId');
+    assert(() {
+      print('更新文件状态为已清理: $audioFileId');
+      return true;
+    }());
   }
 
   /// 清理临时文件
@@ -271,10 +350,16 @@ class AudioFileManager {
       final file = File(pendingPath);
       if (await file.exists()) {
         await file.delete();
-        print('清理临时文件: $pendingPath');
+        assert(() {
+          print('清理临时文件: $pendingPath');
+          return true;
+        }());
       }
     } catch (e) {
-      print('清理临时文件失败: $pendingPath, 错误: $e');
+      assert(() {
+        print('清理临时文件失败: $pendingPath, 错误: $e');
+        return true;
+      }());
     }
   }
 
@@ -344,7 +429,10 @@ class AudioFileManager {
         'totalSize': totalSize,
       };
     } catch (e) {
-      print('获取文件统计信息失败: $e');
+      assert(() {
+        print('获取文件统计信息失败: $e');
+        return true;
+      }());
       return {
         'totalFiles': 0,
         'pendingFiles': 0,

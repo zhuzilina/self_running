@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'package:hive/hive.dart';
 import '../data/models/daily_steps_base.dart';
 import '../data/models/daily_steps.dart';
@@ -68,7 +84,10 @@ class DailyStepsBaseService {
         updatedAt: now,
       );
       await _box!.put(existingBase.key, updatedBase);
-      print('Updated today base: $updatedBase');
+      assert(() {
+        print('Updated today base: $updatedBase');
+        return true;
+      }());
       return updatedBase;
     } else {
       // 创建新记录
@@ -92,7 +111,10 @@ class DailyStepsBaseService {
       );
 
       await _box!.add(newBase);
-      print('Created today base: $newBase');
+      assert(() {
+        print('Created today base: $newBase');
+        return true;
+      }());
       return newBase;
     }
   }
@@ -103,16 +125,25 @@ class DailyStepsBaseService {
     final latestDate = latestBase.localDay;
     final daysDifference = today.difference(latestDate).inDays;
 
-    print(
+    assert(() {
+
+      print(
       'Days difference: $daysDifference, Latest base: ${latestBase.actualStepCount}, Current: $currentStepCount',
     );
+
+      return true;
+
+    }());
 
     if (daysDifference == 1) {
       // 相差1天：第二天的基数 = 前一天基数 + 前一天的步数值
       final newBase = latestBase.actualStepCount + latestBase.todaySteps;
-      print(
+      assert(() {
+        print(
         'Next day base calculation: ${latestBase.actualStepCount} + ${latestBase.todaySteps} = $newBase',
       );
+        return true;
+      }());
 
       // 如果当前传感器值小于新基数，则将当前传感器值设置为基数
       if (currentStepCount < newBase) {
@@ -125,11 +156,17 @@ class DailyStepsBaseService {
       return newBase;
     } else if (daysDifference > 1) {
       // 相差多天：使用最新步数作为基数
-      print('Multiple days difference, using latest as base');
+      assert(() {
+        print('Multiple days difference, using latest as base');
+        return true;
+      }());
       return latestBase.actualStepCount;
     } else {
       // 同一天：使用最新步数作为基数
-      print('Same day, using latest as base');
+      assert(() {
+        print('Same day, using latest as base');
+        return true;
+      }());
       return latestBase.actualStepCount;
     }
   }
@@ -193,7 +230,10 @@ class DailyStepsBaseService {
     final existingBase = await getTodayBase();
     if (existingBase != null) {
       await _box!.delete(existingBase.key);
-      print('Reset today base');
+      assert(() {
+        print('Reset today base');
+        return true;
+      }());
     }
   }
 
@@ -217,7 +257,10 @@ class DailyStepsBaseService {
     }
 
     await _box!.deleteAll(keysToDelete);
-    print('Cleaned up ${keysToDelete.length} old base records');
+    assert(() {
+      print('Cleaned up ${keysToDelete.length} old base records');
+      return true;
+    }());
   }
 
   /// 确保初始化

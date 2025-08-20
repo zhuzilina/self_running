@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'package:intl/intl.dart';
 import '../data/models/daily_steps.dart';
 import '../data/models/user_daily_data.dart';
@@ -28,7 +44,10 @@ class HealthDataSyncService {
       final healthData = _storageService.loadAllDailySteps();
 
       if (healthData.isEmpty) {
-        print('HealthDataSyncService: 暂无健康数据');
+        assert(() {
+          print('HealthDataSyncService: 暂无健康数据');
+          return true;
+        }());
         return;
       }
 
@@ -40,9 +59,18 @@ class HealthDataSyncService {
         await _syncSingleDayData(dailySteps, userProfile);
       }
 
-      print('HealthDataSyncService: 同步完成，共处理 ${healthData.length} 条数据');
+      assert(() {
+
+        print('HealthDataSyncService: 同步完成，共处理 ${healthData.length} 条数据');
+
+        return true;
+
+      }());
     } catch (e) {
-      print('HealthDataSyncService: 同步失败 - $e');
+      assert(() {
+        print('HealthDataSyncService: 同步失败 - $e');
+        return true;
+      }());
     }
   }
 
@@ -78,7 +106,10 @@ class HealthDataSyncService {
         await _databaseService.saveUserDailyData(newData);
       }
     } catch (e) {
-      print('HealthDataSyncService: 同步单日数据失败 ${dailySteps.localDay} - $e');
+      assert(() {
+        print('HealthDataSyncService: 同步单日数据失败 ${dailySteps.localDay} - $e');
+        return true;
+      }());
     }
   }
 
@@ -100,12 +131,21 @@ class HealthDataSyncService {
       if (todayHealthData != null) {
         final userProfile = await _userProfileService.getUserProfile();
         await _syncSingleDayData(todayHealthData, userProfile);
-        print('HealthDataSyncService: 今日数据同步完成，步数: ${todayHealthData.steps}');
+        assert(() {
+          print('HealthDataSyncService: 今日数据同步完成，步数: ${todayHealthData.steps}');
+          return true;
+        }());
       } else {
-        print('HealthDataSyncService: 未找到今日健康数据');
+        assert(() {
+          print('HealthDataSyncService: 未找到今日健康数据');
+          return true;
+        }());
       }
     } catch (e) {
-      print('HealthDataSyncService: 同步今日数据失败 - $e');
+      assert(() {
+        print('HealthDataSyncService: 同步今日数据失败 - $e');
+        return true;
+      }());
     }
   }
 

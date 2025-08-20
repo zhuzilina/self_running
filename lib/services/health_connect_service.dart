@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'package:flutter/services.dart';
 import '../data/models/daily_steps.dart';
 
@@ -17,10 +33,16 @@ class HealthConnectService {
       final bool? available = await _channel.invokeMethod(
         'isHealthConnectAvailable',
       );
-      print('Health Connect available: $available');
+      assert(() {
+        print('Health Connect available: $available');
+        return true;
+      }());
       return available ?? false;
     } catch (e) {
-      print('Error checking Health Connect availability: $e');
+      assert(() {
+        print('Error checking Health Connect availability: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -31,10 +53,16 @@ class HealthConnectService {
       final bool? granted = await _channel.invokeMethod(
         'requestHealthConnectPermissions',
       );
-      print('Health Connect permissions granted: $granted');
+      assert(() {
+        print('Health Connect permissions granted: $granted');
+        return true;
+      }());
       return granted ?? false;
     } catch (e) {
-      print('Error requesting Health Connect permissions: $e');
+      assert(() {
+        print('Error requesting Health Connect permissions: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -53,7 +81,13 @@ class HealthConnectService {
           result['timestamp'] ?? DateTime.now().millisecondsSinceEpoch;
       final DateTime localDay = DateTime.fromMillisecondsSinceEpoch(timestamp);
 
-      print('Today steps from Health Connect: $steps');
+      assert(() {
+
+        print('Today steps from Health Connect: $steps');
+
+        return true;
+
+      }());
 
       return DailySteps(
         localDay: DateTime(localDay.year, localDay.month, localDay.day),
@@ -61,7 +95,10 @@ class HealthConnectService {
         tzOffsetMinutes: localDay.timeZoneOffset.inMinutes,
       );
     } catch (e) {
-      print('Error getting today steps from Health Connect: $e');
+      assert(() {
+        print('Error getting today steps from Health Connect: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -98,10 +135,19 @@ class HealthConnectService {
       // 按日期排序
       stepsList.sort((a, b) => a.localDay.compareTo(b.localDay));
 
-      print('Steps data from Health Connect: ${stepsList.length} days');
+      assert(() {
+
+        print('Steps data from Health Connect: ${stepsList.length} days');
+
+        return true;
+
+      }());
       return stepsList;
     } catch (e) {
-      print('Error getting steps in range from Health Connect: $e');
+      assert(() {
+        print('Error getting steps in range from Health Connect: $e');
+        return true;
+      }());
       return [];
     }
   }
@@ -111,11 +157,17 @@ class HealthConnectService {
     try {
       final int? heartRate = await _channel.invokeMethod('getRecentHeartRate');
       if (heartRate != null) {
-        print('Recent heart rate from Health Connect: $heartRate bpm');
+        assert(() {
+          print('Recent heart rate from Health Connect: $heartRate bpm');
+          return true;
+        }());
       }
       return heartRate;
     } catch (e) {
-      print('Error getting recent heart rate from Health Connect: $e');
+      assert(() {
+        print('Error getting recent heart rate from Health Connect: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -125,11 +177,17 @@ class HealthConnectService {
     try {
       final int? calories = await _channel.invokeMethod('getTodayCalories');
       if (calories != null) {
-        print('Today calories from Health Connect: $calories');
+        assert(() {
+          print('Today calories from Health Connect: $calories');
+          return true;
+        }());
       }
       return calories;
     } catch (e) {
-      print('Error getting today calories from Health Connect: $e');
+      assert(() {
+        print('Error getting today calories from Health Connect: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -139,11 +197,17 @@ class HealthConnectService {
     try {
       final double? distance = await _channel.invokeMethod('getTodayDistance');
       if (distance != null) {
-        print('Today distance from Health Connect: ${distance}m');
+        assert(() {
+          print('Today distance from Health Connect: ${distance}m');
+          return true;
+        }());
       }
       return distance;
     } catch (e) {
-      print('Error getting today distance from Health Connect: $e');
+      assert(() {
+        print('Error getting today distance from Health Connect: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -171,10 +235,19 @@ class HealthConnectService {
         'heartRate': permissions['heartRate'] ?? false,
       };
 
-      print('Health Connect permissions status: $result');
+      assert(() {
+
+        print('Health Connect permissions status: $result');
+
+        return true;
+
+      }());
       return result;
     } catch (e) {
-      print('Error checking Health Connect permissions: $e');
+      assert(() {
+        print('Error checking Health Connect permissions: $e');
+        return true;
+      }());
       return {
         'steps': false,
         'distance': false,

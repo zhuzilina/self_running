@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,9 +53,15 @@ class RankingPage extends ConsumerWidget {
     dynamic profile,
   ) {
     // 添加调试信息
-    print('RankingPage: 加载到 ${userDataList.length} 条用户数据');
+    assert(() {
+      print('RankingPage: 加载到 ${userDataList.length} 条用户数据');
+      return true;
+    }());
     for (final data in userDataList) {
-      print('RankingPage: ${data.date} - ${data.nickname} - ${data.steps} 步');
+      assert(() {
+        print('RankingPage: ${data.date} - ${data.nickname} - ${data.steps} 步');
+        return true;
+      }());
     }
 
     // 按步数排序，步数多的在前面

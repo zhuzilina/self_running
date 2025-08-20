@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'dart:async';
 import 'package:flutter/services.dart';
 import '../data/models/daily_steps.dart';
@@ -28,7 +44,10 @@ class SensorStepsService {
 
   /// 初始化传感器服务
   Future<void> initialize() async {
-    print('Initializing sensor steps service...');
+    assert(() {
+      print('Initializing sensor steps service...');
+      return true;
+    }());
     await _storage.init();
     await _baseService.init();
     await _fetchCurrentSteps();
@@ -52,7 +71,10 @@ class SensorStepsService {
       );
 
       if (stepCount != null) {
-        print('Current sensor step count: $stepCount');
+        assert(() {
+          print('Current sensor step count: $stepCount');
+          return true;
+        }());
 
         // 使用新的步数基数服务计算今日步数
         final todaySteps = await _calculateTodayStepsWithBase(stepCount);
@@ -60,18 +82,27 @@ class SensorStepsService {
         if (todaySteps != null) {
           _stepsController?.add(todaySteps);
           await _saveTodaySteps(todaySteps);
-          print('Updated today steps: ${todaySteps.steps}');
+          assert(() {
+            print('Updated today steps: ${todaySteps.steps}');
+            return true;
+          }());
         }
 
         _lastStepCount = stepCount;
         _lastUpdateTime = DateTime.now();
         return stepCount;
       } else {
-        print('Failed to get sensor step count');
+        assert(() {
+          print('Failed to get sensor step count');
+          return true;
+        }());
         return null;
       }
     } catch (e) {
-      print('Error fetching sensor steps: $e');
+      assert(() {
+        print('Error fetching sensor steps: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -98,7 +129,10 @@ class SensorStepsService {
       }
       return null;
     } catch (e) {
-      print('Error calculating today steps with base: $e');
+      assert(() {
+        print('Error calculating today steps with base: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -131,12 +165,18 @@ class SensorStepsService {
           steps: currentStepCount,
           tzOffsetMinutes: startOfDay.timeZoneOffset.inMinutes,
         );
-        print('First time today steps: $currentStepCount');
+        assert(() {
+          print('First time today steps: $currentStepCount');
+          return true;
+        }());
         return todaySteps;
       }
       return null;
     } catch (e) {
-      print('Error calculating today steps: $e');
+      assert(() {
+        print('Error calculating today steps: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -155,7 +195,10 @@ class SensorStepsService {
       }
       return null;
     } catch (e) {
-      print('Error getting today steps from storage: $e');
+      assert(() {
+        print('Error getting today steps from storage: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -179,9 +222,15 @@ class SensorStepsService {
       }
 
       await _storage.saveDailySteps(allSteps);
-      print('Today steps saved to storage: ${todaySteps.steps}');
+      assert(() {
+        print('Today steps saved to storage: ${todaySteps.steps}');
+        return true;
+      }());
     } catch (e) {
-      print('Error saving today steps: $e');
+      assert(() {
+        print('Error saving today steps: $e');
+        return true;
+      }());
     }
   }
 
@@ -217,7 +266,10 @@ class SensorStepsService {
         }
       }
     } catch (e) {
-      print('Error resetting today steps: $e');
+      assert(() {
+        print('Error resetting today steps: $e');
+        return true;
+      }());
     }
   }
 
@@ -225,6 +277,9 @@ class SensorStepsService {
   void dispose() {
     _periodicTimer?.cancel();
     _stepsController?.close();
-    print('Sensor steps service disposed');
+    assert(() {
+      print('Sensor steps service disposed');
+      return true;
+    }());
   }
 }

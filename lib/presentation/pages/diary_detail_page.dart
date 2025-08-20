@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -197,11 +213,26 @@ class _DiaryDetailPageState extends ConsumerState<DiaryDetailPage> {
     super.initState();
     // 添加调试信息
     assert(() {
-      print('🚀 DiaryDetailPage 初始化:');
-      print('  - isFromPinned: ${widget.isFromPinned}');
-      print('  - allDiaries 数量: ${widget.allDiaries?.length ?? 0}');
-      print('  - pinnedDiaries 数量: ${widget.pinnedDiaries?.length ?? 0}');
-      print('  - initialIndex: ${widget.initialIndex}');
+      assert(() {
+        print('🚀 DiaryDetailPage 初始化:');
+        return true;
+      }());
+      assert(() {
+        print('  - isFromPinned: ${widget.isFromPinned}');
+        return true;
+      }());
+      assert(() {
+        print('  - allDiaries 数量: ${widget.allDiaries?.length ?? 0}');
+        return true;
+      }());
+      assert(() {
+        print('  - pinnedDiaries 数量: ${widget.pinnedDiaries?.length ?? 0}');
+        return true;
+      }());
+      assert(() {
+        print('  - initialIndex: ${widget.initialIndex}');
+        return true;
+      }());
       return true;
     }());
 
@@ -210,13 +241,19 @@ class _DiaryDetailPageState extends ConsumerState<DiaryDetailPage> {
     if (widget.isFromPinned) {
       targetDiaries = widget.pinnedDiaries;
       assert(() {
-        print('  - 使用置顶日记数据源');
+        assert(() {
+          print('  - 使用置顶日记数据源');
+          return true;
+        }());
         return true;
       }());
     } else {
       targetDiaries = widget.allDiaries;
       assert(() {
-        print('  - 使用普通日记数据源');
+        assert(() {
+          print('  - 使用普通日记数据源');
+          return true;
+        }());
         return true;
       }());
     }
@@ -228,19 +265,28 @@ class _DiaryDetailPageState extends ConsumerState<DiaryDetailPage> {
         targetDiaries.length - 1,
       );
       assert(() {
-        print('  - 设置初始页面索引: $_currentDiaryIndex');
+        assert(() {
+          print('  - 设置初始页面索引: $_currentDiaryIndex');
+          return true;
+        }());
         return true;
       }());
     } else {
       _currentDiaryIndex = 0;
       assert(() {
-        print('  - 使用默认页面索引: $_currentDiaryIndex');
+        assert(() {
+          print('  - 使用默认页面索引: $_currentDiaryIndex');
+          return true;
+        }());
         return true;
       }());
     }
     _pageController = PageController(initialPage: _currentDiaryIndex);
     assert(() {
-      print('  ✅ 初始化完成');
+      assert(() {
+        print('  ✅ 初始化完成');
+        return true;
+      }());
       return true;
     }());
   }
@@ -312,12 +358,30 @@ class _DiaryDetailPageState extends ConsumerState<DiaryDetailPage> {
             _currentDiaryIndex = index;
           });
           assert(() {
-            print('📄 PageView 页面切换:');
-            print('  - 从页面: $_currentDiaryIndex');
-            print('  - 到页面: $index');
-            print('  - 总页面数: ${targetDiaries!.length}'); // 这里已经检查过非空
-            print('  - 数据源: ${widget.isFromPinned ? "置顶日记" : "普通日记"}');
-            print('  ✅ 页面切换成功');
+            assert(() {
+              print('📄 PageView 页面切换:');
+              return true;
+            }());
+            assert(() {
+              print('  - 从页面: $_currentDiaryIndex');
+              return true;
+            }());
+            assert(() {
+              print('  - 到页面: $index');
+              return true;
+            }());
+            assert(() {
+              print('  - 总页面数: ${targetDiaries!.length}');
+              return true;
+            }()); // 这里已经检查过非空
+            assert(() {
+              print('  - 数据源: ${widget.isFromPinned ? "置顶日记" : "普通日记"}');
+              return true;
+            }());
+            assert(() {
+              print('  ✅ 页面切换成功');
+              return true;
+            }());
             return true;
           }());
         },
@@ -776,8 +840,14 @@ class _DiaryDetailPageState extends ConsumerState<DiaryDetailPage> {
                           filterQuality: FilterQuality.high,
                           errorBuilder: (context, error, stackTrace) {
                             assert(() {
-                              print('图片加载错误: $error');
-                              print('图片路径: ${file.path}');
+                              assert(() {
+                                print('图片加载错误: $error');
+                                return true;
+                              }());
+                              assert(() {
+                                print('图片路径: ${file.path}');
+                                return true;
+                              }());
                               return true;
                             }());
                             return Container(
@@ -974,8 +1044,14 @@ class _ImagePreviewPageState extends State<ImagePreviewPage> {
                 },
                 errorBuilder: (context, error, stackTrace) {
                   assert(() {
-                    print('图片预览加载错误: $error');
-                    print('图片路径: ${widget.imagePaths[index]}');
+                    assert(() {
+                      print('图片预览加载错误: $error');
+                      return true;
+                    }());
+                    assert(() {
+                      print('图片路径: ${widget.imagePaths[index]}');
+                      return true;
+                    }());
                     return true;
                   }());
                   return Container(

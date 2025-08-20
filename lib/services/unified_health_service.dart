@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import '../data/models/daily_steps.dart';
 import 'health_connect_service.dart';
 import 'health_permission_service.dart';
@@ -18,13 +34,19 @@ class UnifiedHealthService {
 
   /// 初始化健康数据服务
   Future<void> initialize() async {
-    print('Initializing unified health service...');
+    assert(() {
+      print('Initializing unified health service...');
+      return true;
+    }());
 
     // 优先尝试Health Connect
     final isHealthConnectAvailable = await _healthConnectService.isAvailable();
     if (isHealthConnectAvailable) {
       _currentDataSource = HealthDataSource.healthConnect;
-      print('Using Health Connect data source');
+      assert(() {
+        print('Using Health Connect data source');
+        return true;
+      }());
       return;
     }
 
@@ -33,13 +55,19 @@ class UnifiedHealthService {
         .isHealthDataAvailable();
     if (isHealthAvailable) {
       _currentDataSource = HealthDataSource.googleFit;
-      print('Using Google Fit/HealthKit data source');
+      assert(() {
+        print('Using Google Fit/HealthKit data source');
+        return true;
+      }());
       return;
     }
 
     // 使用传感器
     _currentDataSource = HealthDataSource.sensor;
-    print('Using sensor data source');
+    assert(() {
+      print('Using sensor data source');
+      return true;
+    }());
   }
 
   /// 获取当前健康数据源

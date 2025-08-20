@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'dart:async';
 import 'package:flutter/services.dart';
 import '../data/models/daily_steps.dart';
@@ -55,7 +71,10 @@ class RealtimeStepsService {
       );
 
       if (stepCount != null) {
-        print('Current sensor step count: $stepCount');
+        assert(() {
+          print('Current sensor step count: $stepCount');
+          return true;
+        }());
 
         // 使用步数基数服务计算今日步数
         final todaySteps = await _calculateTodayStepsWithBase(stepCount);
@@ -63,17 +82,26 @@ class RealtimeStepsService {
         if (todaySteps != null) {
           _stepsController?.add(todaySteps);
           await _saveTodaySteps(todaySteps);
-          print('Updated today steps: ${todaySteps.steps}');
+          assert(() {
+            print('Updated today steps: ${todaySteps.steps}');
+            return true;
+          }());
         }
 
         return todaySteps;
       } else {
-        print('Failed to get sensor step count');
+        assert(() {
+          print('Failed to get sensor step count');
+          return true;
+        }());
         _stepsController?.add(null);
         return null;
       }
     } catch (e) {
-      print('Error fetching today steps from sensor: $e');
+      assert(() {
+        print('Error fetching today steps from sensor: $e');
+        return true;
+      }());
       _stepsController?.add(null);
       return null;
     }
@@ -101,7 +129,10 @@ class RealtimeStepsService {
       }
       return null;
     } catch (e) {
-      print('Error calculating today steps with base: $e');
+      assert(() {
+        print('Error calculating today steps with base: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -130,9 +161,15 @@ class RealtimeStepsService {
       }
 
       await _storage.saveDailySteps(allSteps);
-      print('Today steps saved to storage: ${todaySteps.steps}');
+      assert(() {
+        print('Today steps saved to storage: ${todaySteps.steps}');
+        return true;
+      }());
     } catch (e) {
-      print('Error saving today steps: $e');
+      assert(() {
+        print('Error saving today steps: $e');
+        return true;
+      }());
     }
   }
 
@@ -140,6 +177,9 @@ class RealtimeStepsService {
   void dispose() {
     _timer?.cancel();
     _stepsController?.close();
-    print('Realtime steps service disposed');
+    assert(() {
+      print('Realtime steps service disposed');
+      return true;
+    }());
   }
 }

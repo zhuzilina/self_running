@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'package:health/health.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -17,7 +33,10 @@ class HealthPermissionService {
       final box = await Hive.openBox('app_settings');
       return box.get(_dontRemindKey, defaultValue: false);
     } catch (e) {
-      print('Error checking dont remind setting: $e');
+      assert(() {
+        print('Error checking dont remind setting: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -28,7 +47,10 @@ class HealthPermissionService {
       final box = await Hive.openBox('app_settings');
       await box.put(_dontRemindKey, true);
     } catch (e) {
-      print('Error setting dont remind: $e');
+      assert(() {
+        print('Error setting dont remind: $e');
+        return true;
+      }());
     }
   }
 
@@ -36,10 +58,16 @@ class HealthPermissionService {
   Future<bool> requestActivityPermission() async {
     try {
       final status = await Permission.activityRecognition.request();
-      print('Activity recognition permission status: $status');
+      assert(() {
+        print('Activity recognition permission status: $status');
+        return true;
+      }());
       return status.isGranted;
     } catch (e) {
-      print('Error requesting activity permission: $e');
+      assert(() {
+        print('Error requesting activity permission: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -48,10 +76,16 @@ class HealthPermissionService {
   Future<bool> checkActivityPermission() async {
     try {
       final status = await Permission.activityRecognition.status;
-      print('Activity recognition permission status: $status');
+      assert(() {
+        print('Activity recognition permission status: $status');
+        return true;
+      }());
       return status.isGranted;
     } catch (e) {
-      print('Error checking activity permission: $e');
+      assert(() {
+        print('Error checking activity permission: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -61,7 +95,10 @@ class HealthPermissionService {
     try {
       await openAppSettings();
     } catch (e) {
-      print('Error opening app settings: $e');
+      assert(() {
+        print('Error opening app settings: $e');
+        return true;
+      }());
     }
   }
 
@@ -83,10 +120,16 @@ class HealthPermissionService {
         HealthDataType.STEPS,
       ]);
       final hasPermission = data.isNotEmpty || (permissionsResult ?? false);
-      print('Health permissions check result: $hasPermission');
+      assert(() {
+        print('Health permissions check result: $hasPermission');
+        return true;
+      }());
       return hasPermission;
     } catch (e) {
-      print('Error checking health permissions: $e');
+      assert(() {
+        print('Error checking health permissions: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -115,10 +158,19 @@ class HealthPermissionService {
         permissions: permissions,
       );
 
-      print('Health permissions request result: $granted');
+      assert(() {
+
+        print('Health permissions request result: $granted');
+
+        return true;
+
+      }());
       return granted;
     } catch (e) {
-      print('Error requesting health permissions: $e');
+      assert(() {
+        print('Error requesting health permissions: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -127,10 +179,16 @@ class HealthPermissionService {
   Future<bool> isHealthDataAvailable() async {
     try {
       final available = await _health.isDataTypeAvailable(HealthDataType.STEPS);
-      print('Health data available: $available');
+      assert(() {
+        print('Health data available: $available');
+        return true;
+      }());
       return available;
     } catch (e) {
-      print('Error checking health data availability: $e');
+      assert(() {
+        print('Error checking health data availability: $e');
+        return true;
+      }());
       return false;
     }
   }

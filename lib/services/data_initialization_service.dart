@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'package:flutter/material.dart';
 import '../data/models/diary.dart';
 import '../data/models/user_daily_data.dart';
@@ -167,9 +183,18 @@ class DataInitializationService {
         }
       }
 
-      print('今日数据预保存完成');
+      assert(() {
+
+        print('今日数据预保存完成');
+
+        return true;
+
+      }());
     } catch (e) {
-      print('预保存今日数据失败: $e');
+      assert(() {
+        print('预保存今日数据失败: $e');
+        return true;
+      }());
     }
   }
 
@@ -195,7 +220,10 @@ class DataInitializationService {
         diaryContent: diaryContent,
       );
     } catch (e) {
-      print('智能保存今日数据失败: $e');
+      assert(() {
+        print('智能保存今日数据失败: $e');
+        return true;
+      }());
       rethrow;
     }
   }
@@ -204,9 +232,15 @@ class DataInitializationService {
   Future<void> updateEditableStatusForDateChange() async {
     try {
       await _databaseService!.updateEditableStatusForDateChange();
-      print('编辑状态更新完成');
+      assert(() {
+        print('编辑状态更新完成');
+        return true;
+      }());
     } catch (e) {
-      print('更新编辑状态失败: $e');
+      assert(() {
+        print('更新编辑状态失败: $e');
+        return true;
+      }());
     }
   }
 
@@ -217,10 +251,16 @@ class DataInitializationService {
       if (yesterdayDiary != null && yesterdayDiary.isEditable) {
         final nonEditableDiary = yesterdayDiary.copyWith(isEditable: false);
         await _databaseService!.saveDiary(nonEditableDiary);
-        print('已标记昨日记录为不可修改: $yesterdayId');
+        assert(() {
+          print('已标记昨日记录为不可修改: $yesterdayId');
+          return true;
+        }());
       }
     } catch (e) {
-      print('标记昨日记录失败: $e');
+      assert(() {
+        print('标记昨日记录失败: $e');
+        return true;
+      }());
     }
   }
 
@@ -245,10 +285,16 @@ class DataInitializationService {
           updatedAt: DateTime.now(),
         );
         await _databaseService!.saveUserDailyData(todayUserData);
-        print('已创建今日用户数据: $todayId');
+        assert(() {
+          print('已创建今日用户数据: $todayId');
+          return true;
+        }());
       }
     } catch (e) {
-      print('创建今日用户数据失败: $e');
+      assert(() {
+        print('创建今日用户数据失败: $e');
+        return true;
+      }());
     }
   }
 
@@ -264,10 +310,16 @@ class DataInitializationService {
           isEditable: true,
         );
         await _databaseService!.saveDiary(todayDiary);
-        print('已创建今日日记记录: $todayId');
+        assert(() {
+          print('已创建今日日记记录: $todayId');
+          return true;
+        }());
       }
     } catch (e) {
-      print('创建今日日记记录失败: $e');
+      assert(() {
+        print('创建今日日记记录失败: $e');
+        return true;
+      }());
     }
   }
 
@@ -281,7 +333,10 @@ class DataInitializationService {
       final today = DateTime.now();
       return await _databaseService!.isDateEditable(today);
     } catch (e) {
-      print('检查今日记录可编辑状态失败: $e');
+      assert(() {
+        print('检查今日记录可编辑状态失败: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -303,7 +358,10 @@ class DataInitializationService {
   /// 初始化步数服务
   Future<void> _initializeStepsServices() async {
     try {
-      print('Initializing steps services...');
+      assert(() {
+        print('Initializing steps services...');
+        return true;
+      }());
 
       // 初始化传感器步数服务
       final sensorService = SensorStepsService();
@@ -317,9 +375,18 @@ class DataInitializationService {
       final backgroundService = BackgroundStepsService();
       await backgroundService.initialize();
 
-      print('Steps services initialized successfully');
+      assert(() {
+
+        print('Steps services initialized successfully');
+
+        return true;
+
+      }());
     } catch (e) {
-      print('Error initializing steps services: $e');
+      assert(() {
+        print('Error initializing steps services: $e');
+        return true;
+      }());
     }
   }
 }

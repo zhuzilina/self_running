@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'dart:typed_data';
 import '../data/models/diary.dart';
 import '../data/models/audio_file.dart';
@@ -273,7 +289,10 @@ class DiaryService {
         await _fileStorageService.cleanupUnusedFiles(dateId, diary.imagePaths);
       }
     } catch (e) {
-      print('删除日记失败: $e');
+      assert(() {
+        print('删除日记失败: $e');
+        return true;
+      }());
     }
   }
 
@@ -292,7 +311,10 @@ class DiaryService {
 
       return success;
     } catch (e) {
-      print('删除音频文件失败: $e');
+      assert(() {
+        print('删除音频文件失败: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -305,7 +327,10 @@ class DiaryService {
 
       return {...audioStats, ...storageStats};
     } catch (e) {
-      print('获取文件统计信息失败: $e');
+      assert(() {
+        print('获取文件统计信息失败: $e');
+        return true;
+      }());
       return {};
     }
   }
@@ -315,7 +340,10 @@ class DiaryService {
     try {
       await _audioFileManager.triggerCleanup();
     } catch (e) {
-      print('触发清理任务失败: $e');
+      assert(() {
+        print('触发清理任务失败: $e');
+        return true;
+      }());
     }
   }
 
@@ -324,7 +352,10 @@ class DiaryService {
     try {
       await _audioFileManager.initialize();
     } catch (e) {
-      print('初始化日记服务失败: $e');
+      assert(() {
+        print('初始化日记服务失败: $e');
+        return true;
+      }());
     }
   }
 
@@ -356,7 +387,10 @@ class DiaryService {
 
       return audioFile;
     } catch (e) {
-      print('保存音频文件失败: $e');
+      assert(() {
+        print('保存音频文件失败: $e');
+        return true;
+      }());
       return null;
     }
   }

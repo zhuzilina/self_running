@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -65,7 +81,10 @@ class _HomePageState extends ConsumerState<HomePage> {
         }
       }
     } catch (e) {
-      print('权限检查失败: $e');
+      assert(() {
+        print('权限检查失败: $e');
+        return true;
+      }());
     }
   }
 
@@ -110,7 +129,10 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// 初始化步数服务
   Future<void> _initializeStepsServices() async {
     try {
-      print('Initializing steps services in HomePage...');
+      assert(() {
+        print('Initializing steps services in HomePage...');
+        return true;
+      }());
 
       // 初始化传感器步数服务
       final sensorService = SensorStepsService();
@@ -120,9 +142,16 @@ class _HomePageState extends ConsumerState<HomePage> {
       final realtimeService = RealtimeStepsService();
       await realtimeService.initialize();
 
-      print('Steps services initialized in HomePage');
+      assert(() {
+        print('Steps services initialized in HomePage');
+
+        return true;
+      }());
     } catch (e) {
-      print('Error initializing steps services in HomePage: $e');
+      assert(() {
+        print('Error initializing steps services in HomePage: $e');
+        return true;
+      }());
     }
   }
 
@@ -239,7 +268,10 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
   /// 刷新步数数据
   Future<void> _refreshStepsData() async {
     try {
-      print('Refreshing steps data in OverviewTab...');
+      assert(() {
+        print('Refreshing steps data in OverviewTab...');
+        return true;
+      }());
 
       // 手动触发传感器步数服务更新
       final sensorService = SensorStepsService();
@@ -249,9 +281,16 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
       final realtimeService = RealtimeStepsService();
       await realtimeService.refreshTodaySteps();
 
-      print('Steps data refreshed in OverviewTab');
+      assert(() {
+        print('Steps data refreshed in OverviewTab');
+
+        return true;
+      }());
     } catch (e) {
-      print('Error refreshing steps data in OverviewTab: $e');
+      assert(() {
+        print('Error refreshing steps data in OverviewTab: $e');
+        return true;
+      }());
     }
   }
 

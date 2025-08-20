@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
@@ -111,7 +127,10 @@ class FileStorageService {
 
       return {'originalPath': originalPath, 'thumbnailPath': thumbnailPath};
     } catch (e) {
-      print('保存图片和缩略图失败: $e');
+      assert(() {
+        print('保存图片和缩略图失败: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -134,7 +153,10 @@ class FileStorageService {
 
       return filePath;
     } catch (e) {
-      print('直接保存图片失败: $e');
+      assert(() {
+        print('直接保存图片失败: $e');
+        return true;
+      }());
       return null;
     }
   }
@@ -147,7 +169,10 @@ class FileStorageService {
     String dateId,
   ) async {
     try {
-      print('直接保存音频文件: $sourcePath 到日期目录: $dateId');
+      assert(() {
+        print('直接保存音频文件: $sourcePath 到日期目录: $dateId');
+        return true;
+      }());
 
       final audioDir = await getAudioDirectory(dateId);
       final fileExtension = extension(originalName).replaceAll('.', '');
@@ -155,7 +180,10 @@ class FileStorageService {
       // 检查源文件是否存在
       final sourceFile = File(sourcePath);
       if (!await sourceFile.exists()) {
-        print('源音频文件不存在: $sourcePath');
+        assert(() {
+          print('源音频文件不存在: $sourcePath');
+          return true;
+        }());
         return null;
       }
 
@@ -163,21 +191,42 @@ class FileStorageService {
 
       // 读取源文件数据
       final audioData = await sourceFile.readAsBytes();
-      print('读取音频数据成功，大小: ${audioData.length} bytes');
+      assert(() {
+        print('读取音频数据成功，大小: ${audioData.length} bytes');
+        return true;
+      }());
 
       final fileName = _generateHash(audioData, fileExtension);
       final targetPath = join(audioDir.path, fileName);
 
-      print('目标路径: $targetPath');
+      assert(() {
+
+        print('目标路径: $targetPath');
+
+        return true;
+
+      }());
 
       // 复制文件到目标位置
       await sourceFile.copy(targetPath);
 
-      print('音频文件直接保存成功: $targetPath');
+      assert(() {
+
+        print('音频文件直接保存成功: $targetPath');
+
+        return true;
+
+      }());
       return targetPath;
     } catch (e) {
-      print('直接保存音频失败: $e');
-      print('错误堆栈: ${StackTrace.current}');
+      assert(() {
+        print('直接保存音频失败: $e');
+        return true;
+      }());
+      assert(() {
+        print('错误堆栈: ${StackTrace.current}');
+        return true;
+      }());
       return null;
     }
   }
@@ -201,7 +250,10 @@ class FileStorageService {
       // 清理音频文件
       await _cleanupDirectory(audioDir, usedFilePaths);
     } catch (e) {
-      print('清理未使用文件失败: $e');
+      assert(() {
+        print('清理未使用文件失败: $e');
+        return true;
+      }());
     }
   }
 
@@ -215,12 +267,18 @@ class FileStorageService {
         if (file is File) {
           if (!usedFilePaths.contains(file.path)) {
             await file.delete();
-            print('删除未使用的文件: ${file.path}');
+            assert(() {
+              print('删除未使用的文件: ${file.path}');
+              return true;
+            }());
           }
         }
       }
     } catch (e) {
-      print('清理目录失败: $e');
+      assert(() {
+        print('清理目录失败: $e');
+        return true;
+      }());
     }
   }
 
@@ -315,14 +373,20 @@ class FileStorageService {
 
       return filePath;
     } catch (e) {
-      print('保存图片失败: $e');
+      assert(() {
+        print('保存图片失败: $e');
+        return true;
+      }());
       return null;
     }
   }
 
   Future<String?> saveAudio(String sourcePath, String originalName) async {
     try {
-      print('开始保存音频文件: $sourcePath');
+      assert(() {
+        print('开始保存音频文件: $sourcePath');
+        return true;
+      }());
 
       final audioDir = await _audioDirectory;
       final fileExtension = extension(originalName).replaceAll('.', '');
@@ -330,7 +394,10 @@ class FileStorageService {
       // 检查源文件是否存在
       final sourceFile = File(sourcePath);
       if (!await sourceFile.exists()) {
-        print('源音频文件不存在: $sourcePath');
+        assert(() {
+          print('源音频文件不存在: $sourcePath');
+          return true;
+        }());
         return null;
       }
 
@@ -338,21 +405,42 @@ class FileStorageService {
 
       // 读取源文件数据
       final audioData = await sourceFile.readAsBytes();
-      print('读取音频数据成功，大小: ${audioData.length} bytes');
+      assert(() {
+        print('读取音频数据成功，大小: ${audioData.length} bytes');
+        return true;
+      }());
 
       final fileName = _generateHash(audioData, fileExtension);
       final targetPath = join(audioDir.path, fileName);
 
-      print('目标路径: $targetPath');
+      assert(() {
+
+        print('目标路径: $targetPath');
+
+        return true;
+
+      }());
 
       // 复制文件到目标位置
       await sourceFile.copy(targetPath);
 
-      print('音频文件保存成功: $targetPath');
+      assert(() {
+
+        print('音频文件保存成功: $targetPath');
+
+        return true;
+
+      }());
       return targetPath;
     } catch (e) {
-      print('保存音频失败: $e');
-      print('错误堆栈: ${StackTrace.current}');
+      assert(() {
+        print('保存音频失败: $e');
+        return true;
+      }());
+      assert(() {
+        print('错误堆栈: ${StackTrace.current}');
+        return true;
+      }());
       return null;
     }
   }
@@ -366,7 +454,10 @@ class FileStorageService {
       }
       return false;
     } catch (e) {
-      print('删除文件失败: $e');
+      assert(() {
+        print('删除文件失败: $e');
+        return true;
+      }());
       return false;
     }
   }

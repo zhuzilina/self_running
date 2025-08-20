@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -169,7 +185,10 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
       });
     } catch (e) {
       assert(() {
-        print('加载已保存图片失败: $e');
+        assert(() {
+          print('加载已保存图片失败: $e');
+          return true;
+        }());
         return true;
       }());
 
@@ -205,7 +224,10 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
         },
         error: (error, stack) {
           assert(() {
-            print('Error loading steps data in diary page: $error');
+            assert(() {
+              print('Error loading steps data in diary page: $error');
+              return true;
+            }());
             return true;
           }());
           // 如果获取失败，尝试从用户每日数据获取缓存值
@@ -214,7 +236,10 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
       );
     } catch (e) {
       assert(() {
-        print('Error loading steps data in diary page: $e');
+        assert(() {
+          print('Error loading steps data in diary page: $e');
+          return true;
+        }());
         return true;
       }());
       _loadCachedStepsData();
@@ -233,7 +258,10 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
       }
     } catch (e) {
       assert(() {
-        print('Error loading cached steps data: $e');
+        assert(() {
+          print('Error loading cached steps data: $e');
+          return true;
+        }());
         return true;
       }());
     }
@@ -1337,11 +1365,26 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
 
     // 调试信息
     assert(() {
-      print('内容变化: $contentChanged');
-      print('图片变化: $imagesChanged');
-      print('音频路径变化: $audioPathsChanged');
-      print('音频名称变化: $audioNamesChanged');
-      print('是否有修改: $hasChanges');
+      assert(() {
+        print('内容变化: $contentChanged');
+        return true;
+      }());
+      assert(() {
+        print('图片变化: $imagesChanged');
+        return true;
+      }());
+      assert(() {
+        print('音频路径变化: $audioPathsChanged');
+        return true;
+      }());
+      assert(() {
+        print('音频名称变化: $audioNamesChanged');
+        return true;
+      }());
+      assert(() {
+        print('是否有修改: $hasChanges');
+        return true;
+      }());
       return true;
     }());
 
@@ -1483,7 +1526,10 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
   void _resetInitialState() {
     _setInitialState();
     assert(() {
-      print('重置初始状态完成');
+      assert(() {
+        print('重置初始状态完成');
+        return true;
+      }());
       return true;
     }());
   }

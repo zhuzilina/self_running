@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/daily_steps.dart';
 import '../../data/models/user_profile.dart';
@@ -17,7 +33,6 @@ import '../../services/user_daily_data_service.dart';
 import '../../services/data_initialization_service.dart';
 import '../../platform/sensor_channel.dart';
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import '../../services/data_persistence_service.dart';
@@ -122,8 +137,14 @@ final dailyStepsProvider = FutureProvider<List<DailySteps>>((ref) async {
 
     return result;
   } catch (e, stackTrace) {
-    print('dailyStepsProvider: Error - $e');
-    print('Stack trace: $stackTrace');
+    assert(() {
+      print('dailyStepsProvider: Error - $e');
+      return true;
+    }());
+    assert(() {
+      print('Stack trace: $stackTrace');
+      return true;
+    }());
     // 返回一个默认的空列表，避免应用崩溃
     return [];
   }
@@ -140,9 +161,16 @@ Future<void> _refreshStepsData(Ref ref) async {
     final realtimeService = RealtimeStepsService();
     await realtimeService.refreshTodaySteps();
 
-    print('Steps data refreshed successfully');
+    assert(() {
+      print('Steps data refreshed successfully');
+
+      return true;
+    }());
   } catch (e) {
-    print('Error refreshing steps data: $e');
+    assert(() {
+      print('Error refreshing steps data: $e');
+      return true;
+    }());
   }
 }
 
@@ -310,7 +338,10 @@ final userDailyDataRankingProvider = FutureProvider<List<UserDailyData>>((
 
     return allData;
   } catch (e) {
-    print('userDailyDataRankingProvider: Error - $e');
+    assert(() {
+      print('userDailyDataRankingProvider: Error - $e');
+      return true;
+    }());
     return [];
   }
 });

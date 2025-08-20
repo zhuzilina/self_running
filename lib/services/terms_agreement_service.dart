@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'package:hive_flutter/hive_flutter.dart';
 import 'storage_service.dart';
 
@@ -15,7 +31,10 @@ class TermsAgreementService {
       final box = Hive.box(StorageService.dailyStepsBoxName);
       return box.get(_agreementKey, defaultValue: false) ?? false;
     } catch (e) {
-      print('检查用户协议同意状态失败: $e');
+      assert(() {
+        print('检查用户协议同意状态失败: $e');
+        return true;
+      }());
       return false;
     }
   }
@@ -27,7 +46,10 @@ class TermsAgreementService {
       final box = Hive.box(StorageService.dailyStepsBoxName);
       await box.put(_agreementKey, agreed);
     } catch (e) {
-      print('保存用户协议同意状态失败: $e');
+      assert(() {
+        print('保存用户协议同意状态失败: $e');
+        return true;
+      }());
       rethrow;
     }
   }
@@ -39,7 +61,10 @@ class TermsAgreementService {
       final box = Hive.box(StorageService.dailyStepsBoxName);
       await box.delete(_agreementKey);
     } catch (e) {
-      print('清除用户协议同意状态失败: $e');
+      assert(() {
+        print('清除用户协议同意状态失败: $e');
+        return true;
+      }());
       rethrow;
     }
   }

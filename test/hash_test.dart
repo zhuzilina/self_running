@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 榆见晴天
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:crypto/crypto.dart';
@@ -19,7 +35,13 @@ void main() {
       expect(fileName.endsWith('.jpg'), isTrue);
       expect(fileName.length, equals(36)); // 32字符hash + 4字符扩展名
 
-      print('Generated filename: $fileName');
+      assert(() {
+
+        print('Generated filename: $fileName');
+
+        return true;
+
+      }());
     });
 
     test('should generate MD5 hash for audio data', () {
@@ -48,7 +70,13 @@ void main() {
       expect(fileName.endsWith('.m4a'), isTrue);
       expect(fileName.length, equals(36)); // 32字符hash + 4字符扩展名
 
-      print('Generated filename: $fileName');
+      assert(() {
+
+        print('Generated filename: $fileName');
+
+        return true;
+
+      }());
     });
 
     test('should generate different hashes for different data', () {
