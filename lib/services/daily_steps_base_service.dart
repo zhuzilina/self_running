@@ -62,7 +62,7 @@ class DailyStepsBaseService {
     final existingBase = await getTodayBase();
 
     if (existingBase != null) {
-      // 更新现有记录
+      // 更新现有记录的实际步数，但保持基数不变
       final updatedBase = existingBase.copyWith(
         actualStepCount: actualStepCount,
         updatedAt: now,
@@ -79,7 +79,7 @@ class DailyStepsBaseService {
         // 计算基数：使用智能步数比对逻辑
         baseStepCount = _calculateBaseStepCount(latestBase, actualStepCount);
       } else {
-        // 首次安装，基数为0
+        // 首次安装，基数为当前步数（这样今日步数就是0）
         baseStepCount = actualStepCount;
       }
 
@@ -108,16 +108,21 @@ class DailyStepsBaseService {
     );
 
     if (daysDifference == 1) {
-      // 相差1天：检查步数是否减少
-      if (currentStepCount < latestBase.actualStepCount) {
-        // 步数减少，可能是系统重启，基数为0
-        print('Step count decreased, setting base to 0');
+      // 相差1天：第二天的基数 = 前一天基数 + 前一天的步数值
+      final newBase = latestBase.actualStepCount + latestBase.todaySteps;
+      print(
+        'Next day base calculation: ${latestBase.actualStepCount} + ${latestBase.todaySteps} = $newBase',
+      );
+
+      // 如果当前传感器值小于新基数，则将当前传感器值设置为基数
+      if (currentStepCount < newBase) {
+        print(
+          'Current sensor value ($currentStepCount) < new base ($newBase), using current as base',
+        );
         return currentStepCount;
-      } else {
-        // 步数正常增长，使用最新步数作为基数
-        print('Step count increased normally, using latest as base');
-        return latestBase.actualStepCount;
       }
+
+      return newBase;
     } else if (daysDifference > 1) {
       // 相差多天：使用最新步数作为基数
       print('Multiple days difference, using latest as base');

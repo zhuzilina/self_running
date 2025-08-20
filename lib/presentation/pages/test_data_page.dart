@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../states/providers.dart';
 import '../../services/data_persistence_service.dart';
+import '../../services/terms_agreement_service.dart';
+import '../../services/storage_service.dart';
 
 class TestDataPage extends ConsumerStatefulWidget {
   const TestDataPage({super.key});
@@ -195,6 +197,15 @@ class _TestDataPageState extends ConsumerState<TestDataPage> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: _resetTermsAgreement,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.indigo,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('重置用户协议同意状态'),
                     ),
                   ],
                 ),
@@ -570,5 +581,16 @@ class _TestDataPageState extends ConsumerState<TestDataPage> {
         duration: const Duration(seconds: 3),
       ),
     );
+  }
+
+  Future<void> _resetTermsAgreement() async {
+    try {
+      final storageService = StorageService();
+      final termsService = TermsAgreementService(storageService);
+      await termsService.clearAgreementStatus();
+      _showSnackBar('用户协议同意状态已重置！', Colors.green);
+    } catch (e) {
+      _showSnackBar('重置用户协议同意状态失败: $e', Colors.red);
+    }
   }
 }

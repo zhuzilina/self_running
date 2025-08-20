@@ -60,13 +60,16 @@ class SensorStepsService {
         if (todaySteps != null) {
           _stepsController?.add(todaySteps);
           await _saveTodaySteps(todaySteps);
+          print('Updated today steps: ${todaySteps.steps}');
         }
 
         _lastStepCount = stepCount;
         _lastUpdateTime = DateTime.now();
         return stepCount;
+      } else {
+        print('Failed to get sensor step count');
+        return null;
       }
-      return null;
     } catch (e) {
       print('Error fetching sensor steps: $e');
       return null;

@@ -55,6 +55,9 @@ dependencies:
   image: ^4.0.15
   just_waveform: ^0.0.7
   percent_indicator: ^4.2.5
+  url_launcher: ^6.2.5
+  flutter_local_notifications: ^19.4.0
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:

@@ -23,6 +23,8 @@ import 'package:flutter/foundation.dart';
 import '../../services/data_persistence_service.dart';
 import '../../services/health_data_sync_service.dart';
 import '../../services/pinned_diary_service.dart';
+import '../../services/sensor_steps_service.dart';
+import '../../services/realtime_steps_service.dart';
 
 final storageServiceProvider = Provider<StorageService>((ref) {
   return StorageService();
@@ -115,13 +117,34 @@ final dailyStepsProvider = FutureProvider<List<DailySteps>>((ref) async {
     final syncService = ref.read(healthDataSyncServiceProvider);
     await syncService.syncHealthDataToDailyData();
 
+    // 强制刷新步数数据
+    await _refreshStepsData(ref);
+
     return result;
   } catch (e, stackTrace) {
     print('dailyStepsProvider: Error - $e');
+    print('Stack trace: $stackTrace');
     // 返回一个默认的空列表，避免应用崩溃
     return [];
   }
 });
+
+/// 强制刷新步数数据
+Future<void> _refreshStepsData(Ref ref) async {
+  try {
+    // 手动触发传感器步数服务更新
+    final sensorService = SensorStepsService();
+    await sensorService.refreshSteps();
+
+    // 手动触发实时步数服务更新（现在也使用传感器）
+    final realtimeService = RealtimeStepsService();
+    await realtimeService.refreshTodaySteps();
+
+    print('Steps data refreshed successfully');
+  } catch (e) {
+    print('Error refreshing steps data: $e');
+  }
+}
 
 class TodayRanking {
   final int rank;

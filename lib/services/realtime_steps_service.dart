@@ -1,6 +1,8 @@
 import 'dart:async';
-import 'package:health/health.dart';
+import 'package:flutter/services.dart';
 import '../data/models/daily_steps.dart';
+import '../services/storage_service.dart';
+import '../services/daily_steps_base_service.dart';
 
 class RealtimeStepsService {
   static final RealtimeStepsService _instance =
@@ -8,7 +10,12 @@ class RealtimeStepsService {
   factory RealtimeStepsService() => _instance;
   RealtimeStepsService._internal();
 
-  final Health _health = Health();
+  static const MethodChannel _channel = MethodChannel(
+    'com.example.self_running/sensor',
+  );
+  final StorageService _storage = StorageService();
+  final DailyStepsBaseService _baseService = DailyStepsBaseService();
+
   Timer? _timer;
   StreamController<DailySteps?>? _stepsController;
 
@@ -20,37 +27,15 @@ class RealtimeStepsService {
 
   /// 初始化服务
   Future<void> initialize() async {
-    print('Initializing realtime steps service...');
+    print('Initializing realtime steps service (sensor only)...');
+    await _storage.init();
+    await _baseService.init();
 
-    // 配置health插件
-    await _health.configure();
+    // 立即获取一次今日步数
+    await _fetchTodaySteps();
 
-    // 请求权限
-    final types = [
-      HealthDataType.STEPS,
-      HealthDataType.ACTIVE_ENERGY_BURNED,
-      HealthDataType.HEART_RATE,
-    ];
-
-    final permissions = [
-      HealthDataAccess.READ,
-      HealthDataAccess.READ,
-      HealthDataAccess.READ,
-    ];
-
-    final granted = await _health.requestAuthorization(
-      types,
-      permissions: permissions,
-    );
-    print('Health permissions granted: $granted');
-
-    if (granted) {
-      // 立即获取一次今日步数
-      await _fetchTodaySteps();
-
-      // 启动定时器，每30秒更新一次
-      _startPeriodicUpdate();
-    }
+    // 启动定时器，每30秒更新一次
+    _startPeriodicUpdate();
   }
 
   /// 启动定时更新
@@ -59,36 +44,64 @@ class RealtimeStepsService {
     _timer = Timer.periodic(const Duration(seconds: 30), (timer) {
       _fetchTodaySteps();
     });
-    print('Started periodic steps update (30s interval)');
+    print('Started periodic sensor steps update (30s interval)');
   }
 
   /// 获取今日步数
   Future<DailySteps?> _fetchTodaySteps() async {
     try {
-      final now = DateTime.now();
-      final startOfDay = DateTime(now.year, now.month, now.day);
+      final stepCount = await _channel.invokeMethod<int>(
+        'getCumulativeStepCount',
+      );
 
-      // 使用getTotalStepsInInterval获取今日总步数
-      final steps = await _health.getTotalStepsInInterval(startOfDay, now);
+      if (stepCount != null) {
+        print('Current sensor step count: $stepCount');
 
-      if (steps != null && steps > 0) {
-        final todaySteps = DailySteps(
-          localDay: startOfDay,
-          steps: steps,
-          tzOffsetMinutes: startOfDay.timeZoneOffset.inMinutes,
-        );
+        // 使用步数基数服务计算今日步数
+        final todaySteps = await _calculateTodayStepsWithBase(stepCount);
 
-        print('Today steps: $steps');
-        _stepsController?.add(todaySteps);
+        if (todaySteps != null) {
+          _stepsController?.add(todaySteps);
+          await _saveTodaySteps(todaySteps);
+          print('Updated today steps: ${todaySteps.steps}');
+        }
+
         return todaySteps;
       } else {
-        print('No steps data available for today');
+        print('Failed to get sensor step count');
         _stepsController?.add(null);
         return null;
       }
     } catch (e) {
-      print('Error fetching today steps: $e');
+      print('Error fetching today steps from sensor: $e');
       _stepsController?.add(null);
+      return null;
+    }
+  }
+
+  /// 使用步数基数计算今日步数
+  Future<DailySteps?> _calculateTodayStepsWithBase(int currentStepCount) async {
+    try {
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+
+      // 使用步数基数服务更新今日步数
+      final todaySteps = await _baseService.updateTodaySteps(currentStepCount);
+
+      if (todaySteps >= 0) {
+        final dailySteps = DailySteps(
+          localDay: startOfDay,
+          steps: todaySteps,
+          tzOffsetMinutes: startOfDay.timeZoneOffset.inMinutes,
+        );
+        print(
+          'Calculated today steps with base: $todaySteps (actual: $currentStepCount)',
+        );
+        return dailySteps;
+      }
+      return null;
+    } catch (e) {
+      print('Error calculating today steps with base: $e');
       return null;
     }
   }
@@ -98,103 +111,28 @@ class RealtimeStepsService {
     return await _fetchTodaySteps();
   }
 
-  /// 获取指定时间段的步数
-  Future<List<DailySteps>> getStepsInRange(
-    DateTime startTime,
-    DateTime endTime,
-  ) async {
+  /// 保存今日步数到存储
+  Future<void> _saveTodaySteps(DailySteps todaySteps) async {
     try {
-      final raw = await _health.getHealthDataFromTypes(
-        types: const [HealthDataType.STEPS],
-        startTime: startTime,
-        endTime: endTime,
-      );
+      final allSteps = _storage.loadAllDailySteps();
+      bool found = false;
 
-      print('Received ${raw.length} health data points');
-      final Map<DateTime, int> bucket = {};
-
-      for (final d in raw) {
-        final local = DateTime(
-          d.dateFrom.year,
-          d.dateFrom.month,
-          d.dateFrom.day,
-        );
-        final value = (d.value as num?)?.toInt() ?? 0;
-        bucket[local] = (bucket[local] ?? 0) + value;
-        print('Health data: ${d.dateFrom} -> $value steps');
+      for (int i = 0; i < allSteps.length; i++) {
+        if (allSteps[i].localDay.isAtSameMomentAs(todaySteps.localDay)) {
+          allSteps[i] = todaySteps;
+          found = true;
+          break;
+        }
       }
 
-      final List<DailySteps> list =
-          bucket.entries
-              .map(
-                (e) => DailySteps(
-                  localDay: e.key,
-                  steps: e.value,
-                  tzOffsetMinutes: e.key.timeZoneOffset.inMinutes,
-                ),
-              )
-              .toList()
-            ..sort((a, b) => a.localDay.compareTo(b.localDay));
-
-      print('Processed ${list.length} daily steps records');
-      return list;
-    } catch (e) {
-      print('Error fetching steps in range: $e');
-      return [];
-    }
-  }
-
-  /// 获取最近一次心率
-  Future<int?> getRecentHeartRate() async {
-    try {
-      final now = DateTime.now();
-      final oneHourAgo = now.subtract(const Duration(hours: 1));
-
-      final raw = await _health.getHealthDataFromTypes(
-        types: const [HealthDataType.HEART_RATE],
-        startTime: oneHourAgo,
-        endTime: now,
-      );
-
-      if (raw.isNotEmpty) {
-        // 获取最新的心率数据
-        raw.sort((a, b) => b.dateFrom.compareTo(a.dateFrom));
-        final latest = raw.first;
-        final heartRate = (latest.value as num?)?.toInt();
-        print('Recent heart rate: $heartRate bpm');
-        return heartRate;
+      if (!found) {
+        allSteps.add(todaySteps);
       }
 
-      return null;
+      await _storage.saveDailySteps(allSteps);
+      print('Today steps saved to storage: ${todaySteps.steps}');
     } catch (e) {
-      print('Error fetching heart rate: $e');
-      return null;
-    }
-  }
-
-  /// 获取今日卡路里
-  Future<int?> getTodayCalories() async {
-    try {
-      final now = DateTime.now();
-      final startOfDay = DateTime(now.year, now.month, now.day);
-
-      final raw = await _health.getHealthDataFromTypes(
-        types: const [HealthDataType.ACTIVE_ENERGY_BURNED],
-        startTime: startOfDay,
-        endTime: now,
-      );
-
-      int totalCalories = 0;
-      for (final d in raw) {
-        final value = (d.value as num?)?.toInt() ?? 0;
-        totalCalories += value;
-      }
-
-      print('Today calories: $totalCalories');
-      return totalCalories > 0 ? totalCalories : null;
-    } catch (e) {
-      print('Error fetching calories: $e');
-      return null;
+      print('Error saving today steps: $e');
     }
   }
 
@@ -203,31 +141,5 @@ class RealtimeStepsService {
     _timer?.cancel();
     _stepsController?.close();
     print('Realtime steps service disposed');
-  }
-
-  /// 写入测试步数数据
-  Future<bool> writeTestSteps() async {
-    try {
-      final now = DateTime.now();
-      final earlier = now.subtract(const Duration(minutes: 10));
-
-      final success = await _health.writeHealthData(
-        value: 1000, // 写入1000步测试数据
-        type: HealthDataType.STEPS,
-        startTime: earlier,
-        endTime: now,
-        recordingMethod: RecordingMethod.manual,
-      );
-
-      print('Test steps written: $success');
-      if (success) {
-        // 写入成功后立即获取最新数据
-        await _fetchTodaySteps();
-      }
-      return success;
-    } catch (e) {
-      print('Error writing test steps: $e');
-      return false;
-    }
   }
 }

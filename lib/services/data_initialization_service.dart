@@ -6,6 +6,9 @@ import 'user_profile_service.dart';
 import 'diary_service.dart';
 import 'storage_service.dart';
 import '../services/health_data_sync_service.dart';
+import '../services/sensor_steps_service.dart';
+import '../services/realtime_steps_service.dart';
+import '../services/background_steps_service.dart';
 
 class DataInitializationService {
   static final DataInitializationService _instance =
@@ -58,6 +61,9 @@ class DataInitializationService {
     final today = DateTime.now();
     final todayId =
         '${today.year}${today.month.toString().padLeft(2, '0')}${today.day.toString().padLeft(2, '0')}';
+
+    // 初始化步数服务
+    await _initializeStepsServices();
 
     // 同步健康数据到每日数据表
     if (_healthDataSyncService != null) {
@@ -292,5 +298,28 @@ class DataInitializationService {
       'isFuture': isFuture,
       'message': isFuture ? '系统日期设置为未来时间，请检查设备时间设置' : '系统日期正常',
     };
+  }
+
+  /// 初始化步数服务
+  Future<void> _initializeStepsServices() async {
+    try {
+      print('Initializing steps services...');
+
+      // 初始化传感器步数服务
+      final sensorService = SensorStepsService();
+      await sensorService.initialize();
+
+      // 初始化实时步数服务（现在也使用传感器）
+      final realtimeService = RealtimeStepsService();
+      await realtimeService.initialize();
+
+      // 初始化后台步数服务
+      final backgroundService = BackgroundStepsService();
+      await backgroundService.initialize();
+
+      print('Steps services initialized successfully');
+    } catch (e) {
+      print('Error initializing steps services: $e');
+    }
   }
 }

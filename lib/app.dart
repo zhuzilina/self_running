@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'presentation/pages/home_page.dart';
+import 'presentation/pages/terms_privacy_page.dart';
+import 'services/terms_agreement_service.dart';
+import 'services/storage_service.dart';
 
 class App extends StatelessWidget {
   const App({super.key});
@@ -8,6 +11,12 @@ class App extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Self Running',
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const AppStartupPage(),
+        '/home': (context) => const HomePage(),
+        '/terms': (context) => const TermsPrivacyPage(),
+      },
       theme: ThemeData(
         // 使用白色作为基色的配色方案
         colorScheme: ColorScheme.fromSeed(
@@ -159,7 +168,98 @@ class App extends StatelessWidget {
           elevation: 8,
         ),
       ),
-      home: const HomePage(),
     );
+  }
+}
+
+class AppStartupPage extends StatefulWidget {
+  const AppStartupPage({super.key});
+
+  @override
+  State<AppStartupPage> createState() => _AppStartupPageState();
+}
+
+class _AppStartupPageState extends State<AppStartupPage> {
+  bool _isLoading = true;
+  bool _hasAgreed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAgreementStatus();
+  }
+
+  Future<void> _checkAgreementStatus() async {
+    try {
+      final storageService = StorageService();
+      final termsService = TermsAgreementService(storageService);
+      final hasAgreed = await termsService.hasAgreedToTerms();
+
+      if (mounted) {
+        setState(() {
+          _hasAgreed = hasAgreed;
+          _isLoading = false;
+        });
+
+        // 如果用户已同意协议，直接跳转到主页
+        if (hasAgreed) {
+          _navigateToHome();
+        }
+      }
+    } catch (e) {
+      print('检查用户协议状态失败: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _navigateToHome() {
+    if (mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).pushReplacementNamed('/home');
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.black87),
+              ),
+              SizedBox(height: 16),
+              Text(
+                '正在加载...',
+                style: TextStyle(color: Colors.black87, fontSize: 16),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 如果用户已同意协议，显示加载页面（权限检查会在后台进行）
+    if (_hasAgreed) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.black87),
+          ),
+        ),
+      );
+    }
+
+    // 如果用户未同意协议，显示协议页面
+    return const TermsPrivacyPage();
   }
 }

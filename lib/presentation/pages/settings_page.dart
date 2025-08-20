@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'profile_settings_page.dart';
+import 'privacy_settings_page.dart';
+import 'app_info_page.dart';
+import 'reminder_settings_page.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -11,20 +13,20 @@ class SettingsPage extends ConsumerWidget {
       appBar: AppBar(title: const Text('设置')),
       body: ListView(
         children: [
-          // 个人信息设置
+          // 提醒设置
           _buildSettingsSection(
             context,
-            title: '个人信息',
+            title: '提醒设置',
             items: [
               _buildSettingsItem(
                 context,
-                icon: Icons.person,
-                title: '默认个人信息',
-                subtitle: '设置昵称、口号、头像等默认值',
+                icon: Icons.notifications,
+                title: '每日提醒',
+                subtitle: '提示用户记录每天的日记',
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (context) => const ProfileSettingsPage(),
+                      builder: (context) => const ReminderSettingsPage(),
                     ),
                   );
                 },
@@ -32,33 +34,22 @@ class SettingsPage extends ConsumerWidget {
             ],
           ),
 
-          // 应用设置
+          // 隐私权限设置
           _buildSettingsSection(
             context,
-            title: '应用设置',
+            title: '隐私权限',
             items: [
-              _buildSettingsItem(
-                context,
-                icon: Icons.notifications,
-                title: '通知设置',
-                subtitle: '管理推送通知和提醒',
-                onTap: () {
-                  // TODO: 实现通知设置页面
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('功能开发中...')));
-                },
-              ),
               _buildSettingsItem(
                 context,
                 icon: Icons.privacy_tip,
                 title: '隐私设置',
                 subtitle: '管理数据隐私和权限',
                 onTap: () {
-                  // TODO: 实现隐私设置页面
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('功能开发中...')));
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const PrivacySettingsPage(),
+                    ),
+                  );
                 },
               ),
             ],
@@ -75,22 +66,11 @@ class SettingsPage extends ConsumerWidget {
                 title: '应用信息',
                 subtitle: '版本号、开发者信息等',
                 onTap: () {
-                  // TODO: 实现应用信息页面
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('功能开发中...')));
-                },
-              ),
-              _buildSettingsItem(
-                context,
-                icon: Icons.help,
-                title: '帮助与反馈',
-                subtitle: '使用帮助和问题反馈',
-                onTap: () {
-                  // TODO: 实现帮助页面
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('功能开发中...')));
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const AppInfoPage(),
+                    ),
+                  );
                 },
               ),
             ],
@@ -121,17 +101,7 @@ class SettingsPage extends ConsumerWidget {
         ),
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
+          decoration: const BoxDecoration(color: Colors.white),
           child: Column(children: items),
         ),
       ],
@@ -146,15 +116,7 @@ class SettingsPage extends ConsumerWidget {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, color: Colors.grey.shade700, size: 20),
-      ),
+      leading: Icon(icon, color: Colors.grey.shade700, size: 24),
       title: Text(
         title,
         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),

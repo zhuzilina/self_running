@@ -8,6 +8,9 @@ import '../widgets/diary_card.dart';
 import 'ranking_page.dart';
 import 'memories_page.dart';
 import 'settings_page.dart';
+import '../../services/health_permission_service.dart';
+import '../../services/sensor_steps_service.dart';
+import '../../services/realtime_steps_service.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -30,6 +33,97 @@ class _HomePageState extends ConsumerState<HomePage> {
         statusBarBrightness: Brightness.dark,
       ),
     );
+
+    // 检查运动权限
+    _checkActivityPermission();
+
+    // 初始化步数服务
+    _initializeStepsServices();
+  }
+
+  /// 检查运动权限
+  Future<void> _checkActivityPermission() async {
+    try {
+      final healthPermissionService = HealthPermissionService();
+
+      // 检查是否设置了"不再提醒"
+      final dontRemind = await healthPermissionService.isDontRemindSet();
+      if (dontRemind) {
+        return; // 用户选择了不再提醒，不做任何操作
+      }
+
+      // 检查运动权限
+      final hasPermission = await healthPermissionService
+          .checkActivityPermission();
+      if (!hasPermission) {
+        // 尝试请求权限
+        final granted = await healthPermissionService
+            .requestActivityPermission();
+        if (!granted && mounted) {
+          // 如果权限请求失败，显示提示对话框
+          _showPermissionDialog();
+        }
+      }
+    } catch (e) {
+      print('权限检查失败: $e');
+    }
+  }
+
+  /// 显示权限提示对话框
+  void _showPermissionDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('需要运动权限'),
+          content: const Text('如果不授权运动健康权限则App无法记录每日步数'),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                // 设置"不再提醒"
+                final healthPermissionService = HealthPermissionService();
+                await healthPermissionService.setDontRemind();
+                if (mounted) {
+                  Navigator.of(context).pop();
+                }
+              },
+              child: const Text('不再提醒'),
+            ),
+            TextButton(
+              onPressed: () async {
+                // 打开设置页面
+                final healthPermissionService = HealthPermissionService();
+                await healthPermissionService.openAppSettingsPage();
+                if (mounted) {
+                  Navigator.of(context).pop();
+                }
+              },
+              child: const Text('设置'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// 初始化步数服务
+  Future<void> _initializeStepsServices() async {
+    try {
+      print('Initializing steps services in HomePage...');
+
+      // 初始化传感器步数服务
+      final sensorService = SensorStepsService();
+      await sensorService.initialize();
+
+      // 初始化实时步数服务
+      final realtimeService = RealtimeStepsService();
+      await realtimeService.initialize();
+
+      print('Steps services initialized in HomePage');
+    } catch (e) {
+      print('Error initializing steps services in HomePage: $e');
+    }
   }
 
   @override
@@ -142,6 +236,25 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
     _animationController.forward(from: 0.0);
   }
 
+  /// 刷新步数数据
+  Future<void> _refreshStepsData() async {
+    try {
+      print('Refreshing steps data in OverviewTab...');
+
+      // 手动触发传感器步数服务更新
+      final sensorService = SensorStepsService();
+      await sensorService.refreshSteps();
+
+      // 手动触发实时步数服务更新（现在也使用传感器）
+      final realtimeService = RealtimeStepsService();
+      await realtimeService.refreshTodaySteps();
+
+      print('Steps data refreshed in OverviewTab');
+    } catch (e) {
+      print('Error refreshing steps data in OverviewTab: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dailyAsync = ref.watch(dailyStepsProvider);
@@ -162,6 +275,9 @@ class _OverviewTabState extends ConsumerState<_OverviewTab>
 
         return RefreshIndicator(
           onRefresh: () async {
+            // 刷新步数数据
+            await _refreshStepsData();
+            // 刷新Provider数据
             ref.invalidate(dailyStepsProvider);
             await ref.read(dailyStepsProvider.future);
           },

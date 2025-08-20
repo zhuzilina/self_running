@@ -1,19 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:workmanager/workmanager.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'app.dart';
 import 'services/database_service.dart';
-import 'services/health_permission_service.dart';
 import 'services/data_initialization_service.dart';
-import 'services/unified_health_service.dart';
-import 'services/realtime_steps_service.dart';
-import 'services/sensor_steps_service.dart';
-import 'services/background_steps_service.dart';
-import 'services/daily_steps_base_service.dart';
 import 'data/models/daily_steps_base.dart';
 import 'services/storage_service.dart';
 import 'services/user_profile_service.dart';
 import 'services/health_data_sync_service.dart';
+
+// WorkManager回调函数
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((task, inputData) async {
+    // 显示通知
+    final FlutterLocalNotificationsPlugin notifications =
+        FlutterLocalNotificationsPlugin();
+
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'daily_reminder',
+          '每日提醒',
+          channelDescription: '提醒用户记录每天的日记',
+          importance: Importance.high,
+          priority: Priority.high,
+        );
+    const NotificationDetails notificationDetails = NotificationDetails(
+      android: androidDetails,
+    );
+
+    await notifications.show(0, '每日提醒', '记得记录今天的美好瞬间哦！', notificationDetails);
+
+    return Future.value(true);
+  });
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +44,22 @@ void main() async {
   await Hive.initFlutter();
 
   Hive.registerAdapter(DailyStepsBaseAdapter());
+
+  // 初始化WorkManager
+  await Workmanager().initialize(callbackDispatcher);
+
+  // 初始化本地通知
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+  const AndroidInitializationSettings androidSettings =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+  const DarwinInitializationSettings iosSettings =
+      DarwinInitializationSettings();
+  const InitializationSettings initSettings = InitializationSettings(
+    android: androidSettings,
+    iOS: iosSettings,
+  );
+  await flutterLocalNotificationsPlugin.initialize(initSettings);
 
   try {
     // 初始化存储服务

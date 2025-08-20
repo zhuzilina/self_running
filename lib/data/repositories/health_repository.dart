@@ -34,11 +34,8 @@ class HealthRepository {
         'Fetching health data from ${from.toIso8601String()} to ${to.toIso8601String()}',
       );
 
-      final ok = await requestPermissions();
-      if (!ok) {
-        print('Health permissions not granted');
-        return [];
-      }
+      // 不再自动请求权限，直接尝试获取数据
+      // 如果没有权限，将返回空列表
 
       print('Requesting health data...');
       final raw = await _health.getHealthDataFromTypes(

@@ -7,6 +7,7 @@ import '../states/providers.dart';
 import '../../data/models/diary.dart';
 import '../../data/models/audio_file.dart';
 import '../../data/models/user_daily_data.dart';
+import '../../data/models/user_profile.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_sticky_header/flutter_sticky_header.dart';
 import 'package:percent_indicator/percent_indicator.dart';
@@ -313,8 +314,12 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
         ),
       ),
       body: RefreshIndicator(
+        color: Colors.grey.withOpacity(0.4), // 设置刷新指示器颜色为40%灰色
         onRefresh: () async {
+          // 刷新日记数据和用户每日数据
           ref.refresh(allDiariesProvider);
+          ref.refresh(userDailyDataRankingProvider);
+          ref.refresh(pinnedDiariesProvider);
         },
         child: diariesAsync.when(
           loading: () => const Center(
@@ -575,6 +580,7 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
               Consumer(
                 builder: (context, ref, child) {
                   final userDataAsync = ref.watch(userDailyDataRankingProvider);
+
                   return userDataAsync.when(
                     loading: () => Row(
                       children: [
@@ -640,78 +646,11 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
                               data.date.day == diary.date.day,
                         );
                       } catch (e) {
-                        userData = userDataList.isNotEmpty
-                            ? userDataList.first
-                            : null;
+                        // 如果找不到对应日期的数据，返回null，显示默认信息
+                        userData = null;
                       }
 
-                      if (userData == null) {
-                        return Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 12,
-                              backgroundColor: Colors.grey[300],
-                              child: const Icon(
-                                Icons.person,
-                                size: 16,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '未知用户',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ),
-                            const Spacer(),
-                          ],
-                        );
-                      }
-
-                      return Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 12,
-                            backgroundColor: Colors.grey[300],
-                            backgroundImage: userData.avatarPath != null
-                                ? FileImage(File(userData.avatarPath!))
-                                : null,
-                            child: userData.avatarPath == null
-                                ? Text(
-                                    userData.nickname.isNotEmpty
-                                        ? userData.nickname[0]
-                                        : '我',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey[600],
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  )
-                                : null,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              userData.nickname.isNotEmpty
-                                  ? userData.nickname
-                                  : '我的日记',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                          const Spacer(),
-                        ],
-                      );
+                      return _buildUserInfoRow(userData);
                     },
                   );
                 },
@@ -809,6 +748,50 @@ class _MemoriesPageState extends ConsumerState<MemoriesPage> {
           ),
         ),
       ),
+    );
+  }
+
+  // 构建用户信息行
+  Widget _buildUserInfoRow(UserDailyData? userData) {
+    String nickname = '我的日记';
+    String? avatarPath;
+
+    // 只使用对应日期的用户数据
+    if (userData != null) {
+      nickname = userData.nickname.isNotEmpty ? userData.nickname : '我的日记';
+      avatarPath = userData.avatarPath;
+    }
+
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 12,
+          backgroundColor: Colors.grey[300],
+          backgroundImage: avatarPath != null
+              ? FileImage(File(avatarPath))
+              : null,
+          child: avatarPath == null
+              ? Text(
+                  nickname.isNotEmpty ? nickname[0] : '我',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                )
+              : null,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            nickname,
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+          ),
+        ),
+        const Spacer(),
+      ],
     );
   }
 

@@ -55,7 +55,7 @@ void main() {
       final diary = Diary.create(
         content: '测试日记内容',
         date: DateTime.now(),
-        imagePaths: ['test_image1.jpg'],
+        images: [], // 空的图片列表
         audioFiles: [], // 空的音频文件列表
       );
 
