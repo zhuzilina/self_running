@@ -1,0 +1,89 @@
+{
+  "@@locale": "en",
+  "appTitle": "Self Running",
+  "@appTitle": {
+    "description": "Application title"
+  },
+  "loading": "Loading...",
+  "@loading": {
+    "description": "Loading text"
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Cancel button text"
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Save button text"
+  },
+  "confirm": "Confirm",
+  "@confirm": {
+    "description": "Confirm button text"
+  },
+  "delete": "Delete",
+  "@delete": {
+    "description": "Delete button text"
+  },
+  "edit": "Edit",
+  "@edit": {
+    "description": "Edit button text"
+  },
+  "nickname": "Nickname",
+  "@nickname": {
+    "description": "Nickname label"
+  },
+  "slogan": "Slogan",
+  "@slogan": {
+    "description": "Slogan label"
+  },
+  "editNickname": "Edit Nickname",
+  "@editNickname": {
+    "description": "Edit nickname dialog title"
+  },
+  "editSlogan": "Edit Slogan",
+  "@editSlogan": {
+    "description": "Edit slogan dialog title"
+  },
+  "nicknameEmpty": "Nickname cannot be empty",
+  "@nicknameEmpty": {
+    "description": "Error message when nickname is empty"
+  },
+  "saveFailed": "Save failed: {error}",
+  "@saveFailed": {
+    "description": "Save failed message",
+    "placeholders": {
+      "error": {
+        "type": "String",
+        "example": "Network error"
+      }
+    }
+  },
+  "dailyReminder": "Daily Reminder",
+  "@dailyReminder": {
+    "description": "Daily reminder notification title"
+  },
+  "dailyReminderContent": "Remember to record today's beautiful moments!",
+  "@dailyReminderContent": {
+    "description": "Daily reminder notification content"
+  },
+  "home": "Home",
+  "@home": {
+    "description": "Home tab"
+  },
+  "diary": "Diary",
+  "@diary": {
+    "description": "Diary tab"
+  },
+  "memories": "Memories",
+  "@memories": {
+    "description": "Memories tab"
+  },
+  "ranking": "Ranking",
+  "@ranking": {
+    "description": "Ranking tab"
+  },
+  "settings": "Settings",
+  "@settings": {
+    "description": "Settings tab"
+  }
+}

@@ -66,8 +66,9 @@ class _EditNicknameDialogState extends ConsumerState<EditNicknameDialog> {
         controller: _nicknameController,
         decoration: const InputDecoration(
           border: InputBorder.none,
-          contentPadding: EdgeInsets.zero,
+          contentPadding: EdgeInsets.only(left: 12, top: 8),
         ),
+        cursorColor: Colors.grey.withOpacity(0.7),
         autofocus: true,
       ),
       actions: [

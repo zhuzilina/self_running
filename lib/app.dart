@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'presentation/pages/home_page.dart';
 import 'presentation/pages/terms_privacy_page.dart';
 import 'services/terms_agreement_service.dart';
@@ -17,6 +18,17 @@ class App extends StatelessWidget {
         '/home': (context) => const HomePage(),
         '/terms': (context) => const TermsPrivacyPage(),
       },
+      // 配置本地化支持
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('zh', 'CN'), // 中文简体
+        Locale('en', 'US'), // 英文（备用）
+      ],
+      locale: const Locale('zh', 'CN'), // 设置默认语言为中文
       theme: ThemeData(
         // 使用白色作为基色的配色方案
         colorScheme: ColorScheme.fromSeed(
@@ -166,6 +178,13 @@ class App extends StatelessWidget {
           unselectedItemColor: Colors.grey.shade600,
           type: BottomNavigationBarType.fixed,
           elevation: 8,
+        ),
+
+        // 文本选择主题 - 设置选择手柄颜色
+        textSelectionTheme: const TextSelectionThemeData(
+          selectionColor: Colors.blue,
+          selectionHandleColor: Colors.blue,
+          cursorColor: Colors.blue,
         ),
       ),
     );

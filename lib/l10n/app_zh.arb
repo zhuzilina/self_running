@@ -1,0 +1,89 @@
+{
+  "@@locale": "zh",
+  "appTitle": "Self Running",
+  "@appTitle": {
+    "description": "应用标题"
+  },
+  "loading": "正在加载...",
+  "@loading": {
+    "description": "加载提示文本"
+  },
+  "cancel": "取消",
+  "@cancel": {
+    "description": "取消按钮文本"
+  },
+  "save": "保存",
+  "@save": {
+    "description": "保存按钮文本"
+  },
+  "confirm": "确认",
+  "@confirm": {
+    "description": "确认按钮文本"
+  },
+  "delete": "删除",
+  "@delete": {
+    "description": "删除按钮文本"
+  },
+  "edit": "编辑",
+  "@edit": {
+    "description": "编辑按钮文本"
+  },
+  "nickname": "昵称",
+  "@nickname": {
+    "description": "昵称标签"
+  },
+  "slogan": "口号",
+  "@slogan": {
+    "description": "口号标签"
+  },
+  "editNickname": "编辑昵称",
+  "@editNickname": {
+    "description": "编辑昵称对话框标题"
+  },
+  "editSlogan": "编辑口号",
+  "@editSlogan": {
+    "description": "编辑口号对话框标题"
+  },
+  "nicknameEmpty": "昵称不能为空",
+  "@nicknameEmpty": {
+    "description": "昵称为空时的错误提示"
+  },
+  "saveFailed": "保存失败：{error}",
+  "@saveFailed": {
+    "description": "保存失败提示",
+    "placeholders": {
+      "error": {
+        "type": "String",
+        "example": "网络错误"
+      }
+    }
+  },
+  "dailyReminder": "每日提醒",
+  "@dailyReminder": {
+    "description": "每日提醒通知标题"
+  },
+  "dailyReminderContent": "记得记录今天的美好瞬间哦！",
+  "@dailyReminderContent": {
+    "description": "每日提醒通知内容"
+  },
+  "home": "首页",
+  "@home": {
+    "description": "首页标签"
+  },
+  "diary": "日记",
+  "@diary": {
+    "description": "日记标签"
+  },
+  "memories": "回忆",
+  "@memories": {
+    "description": "回忆标签"
+  },
+  "ranking": "排行",
+  "@ranking": {
+    "description": "排行标签"
+  },
+  "settings": "设置",
+  "@settings": {
+    "description": "设置标签"
+  }
+}

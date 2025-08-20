@@ -59,8 +59,9 @@ class _EditSloganDialogState extends ConsumerState<EditSloganDialog> {
         controller: _sloganController,
         decoration: const InputDecoration(
           border: InputBorder.none,
-          contentPadding: EdgeInsets.zero,
+          contentPadding: EdgeInsets.only(left: 12, top: 8),
         ),
+        cursorColor: Colors.grey.withOpacity(0.7),
         maxLines: 3,
         autofocus: true,
       ),
