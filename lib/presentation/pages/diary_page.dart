@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,9 +7,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:crypto/crypto.dart';
 import '../states/providers.dart';
+import '../widgets/saving_overlay.dart';
 import '../../data/models/audio_file.dart';
+import '../../data/models/image_info.dart' as models;
+import '../../services/diary_save_service.dart';
+import '../../services/incremental_save_service.dart';
 
 class DiaryPage extends ConsumerStatefulWidget {
   const DiaryPage({super.key});
@@ -33,7 +35,11 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
   final List<Timer?> _playTimers = []; // 添加播放计时器列表
   bool _isLoading = false;
   bool _isRecording = false;
-  bool _showRecordingIndicator = false; // 添加录音指示器显示状态
+  bool _isClickMode = false; // true: 点击模式, false: 长按模式
+  bool _showSavingOverlay = false; // 显示保存动画覆盖层
+  bool _showSaveSuccessOverlay = false; // 显示保存成功动画
+  double _saveProgress = 0.0; // 保存进度
+  String _saveMessage = '正在保存...'; // 保存消息
   static const int maxImages = 9;
   static const int maxAudios = 9;
   static const Duration maxRecordingDuration = Duration(
@@ -45,14 +51,28 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
   int? _cachedSteps; // 缓存步数数据
 
   // 用于检测修改的变量
-  String? _initialStateHash; // 初始状态的MD5哈希值
   bool _hasUnsavedChanges = false; // 是否有未保存的修改
+  String _initialContent = ''; // 初始文本内容
+  List<Uint8List> _initialImages = []; // 初始图片列表
+  List<String> _initialAudioPaths = []; // 初始音频路径列表
+  List<String> _initialAudioNames = []; // 初始音频名称列表
+
+  // 增量保存相关变量
+  String? _contentChange; // 文本内容变化
+  List<Uint8List> _newImages = []; // 新增的图片
+  List<int> _removedImageIndices = []; // 删除的图片索引
+  List<AudioFile> _newAudioFiles = []; // 新增的音频文件
+  List<int> _removedAudioIndices = []; // 删除的音频索引
+  Map<int, String> _updatedAudioNames = {}; // 更新的音频名称
 
   @override
   void initState() {
     super.initState();
     _loadCurrentDiary();
     _loadStepsData();
+
+    // 监听文本变化
+    _textController.addListener(_onTextChanged);
 
     // 监听焦点变化
     _textFocusNode.addListener(() {
@@ -64,6 +84,7 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
 
   @override
   void dispose() {
+    _textController.removeListener(_onTextChanged);
     _textController.dispose();
     _textFocusNode.dispose(); // 释放焦点节点
     for (final player in _audioPlayers) {
@@ -116,11 +137,11 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
         // 加载已保存的图片
         _loadSavedImages(diary.imagePaths);
       } else {
-        // 如果没有日记，也要生成初始状态哈希值
+        // 如果没有日记，也要设置初始状态
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             _textFocusNode.unfocus();
-            _initialStateHash = _generateStateHash();
+            _setInitialState();
           }
         });
       }
@@ -139,21 +160,24 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
       }
       setState(() {});
 
-      // 图片加载完成后，生成初始状态哈希值
+      // 图片加载完成后，设置初始状态
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _textFocusNode.unfocus();
-          _initialStateHash = _generateStateHash();
+          _setInitialState();
         }
       });
     } catch (e) {
-      print('加载已保存图片失败: $e');
+      assert(() {
+        print('加载已保存图片失败: $e');
+        return true;
+      }());
 
-      // 即使加载失败，也要生成初始状态哈希值
+      // 即使加载失败，也要设置初始状态
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _textFocusNode.unfocus();
-          _initialStateHash = _generateStateHash();
+          _setInitialState();
         }
       });
     }
@@ -180,13 +204,19 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
           // 正在加载时不做任何操作
         },
         error: (error, stack) {
-          print('Error loading steps data in diary page: $error');
+          assert(() {
+            print('Error loading steps data in diary page: $error');
+            return true;
+          }());
           // 如果获取失败，尝试从用户每日数据获取缓存值
           _loadCachedStepsData();
         },
       );
     } catch (e) {
-      print('Error loading steps data in diary page: $e');
+      assert(() {
+        print('Error loading steps data in diary page: $e');
+        return true;
+      }());
       _loadCachedStepsData();
     }
   }
@@ -202,7 +232,10 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
         });
       }
     } catch (e) {
-      print('Error loading cached steps data: $e');
+      assert(() {
+        print('Error loading cached steps data: $e');
+        return true;
+      }());
     }
   }
 
@@ -224,6 +257,8 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
         for (final file in filesToAdd) {
           final bytes = await File(file.path).readAsBytes();
           _selectedImages.add(bytes);
+          // 记录新增的图片
+          _newImages.add(bytes);
         }
 
         setState(() {});
@@ -238,6 +273,8 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
             );
           }
         }
+
+        _updateChangeStatus();
       }
     } catch (e) {
       if (mounted) {
@@ -252,6 +289,13 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
     setState(() {
       _selectedImages.removeAt(index);
     });
+
+    // 记录删除的图片索引
+    // 需要调整索引，因为删除操作会影响后续索引
+    final adjustedIndex = _removedImageIndices.where((i) => i < index).length;
+    _removedImageIndices.add(index - adjustedIndex);
+
+    _updateChangeStatus();
   }
 
   Future<void> _startRecording() async {
@@ -289,7 +333,6 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
         if (mounted) {
           setState(() {
             _isRecording = true;
-            _showRecordingIndicator = true;
             _currentRecordingDuration = Duration.zero;
           });
         }
@@ -359,6 +402,17 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
             _currentPlayPositions.add(Duration.zero); // 添加播放位置
             _playTimers.add(null); // 添加播放计时器
           });
+
+          // 记录新增的音频文件
+          final newAudioFile = AudioFile.create(
+            displayName: '录音 ${_audioPaths.length}',
+            filePath: path,
+            duration: _currentRecordingDuration.inMilliseconds,
+            recordTime: DateTime.now(),
+          );
+          _newAudioFiles.add(newAudioFile);
+
+          _updateChangeStatus();
         }
       }
     } catch (e) {
@@ -369,7 +423,6 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
       if (mounted) {
         setState(() {
           _isRecording = false;
-          _showRecordingIndicator = false;
           _currentRecordingDuration = Duration.zero;
         });
       }
@@ -401,66 +454,6 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
     );
   }
 
-  Widget _buildRecordingIndicator() {
-    final progress =
-        _currentRecordingDuration.inSeconds / maxRecordingDuration.inSeconds;
-    final remainingProgress = 1.0 - progress;
-
-    return Container(
-      width: 150,
-      height: 150,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // 背景圆环（灰色）
-          SizedBox(
-            width: 150,
-            height: 150,
-            child: CircularProgressIndicator(
-              value: 1.0,
-              strokeWidth: 6,
-              backgroundColor: Colors.grey.shade300,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.grey.shade300),
-            ),
-          ),
-          // 进度圆环（白色）
-          SizedBox(
-            width: 150,
-            height: 150,
-            child: CircularProgressIndicator(
-              value: progress,
-              strokeWidth: 6,
-              backgroundColor: Colors.transparent,
-              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-            ),
-          ),
-          // 中心时间显示
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _formatRecordingDuration(_currentRecordingDuration),
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '录音中...',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withOpacity(0.8),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   void _removeAudio(int index) {
     setState(() {
       _playTimers[index]?.cancel(); // 取消播放计时器
@@ -477,6 +470,13 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
       _currentPlayPositions.removeAt(index);
       _playTimers.removeAt(index);
     });
+
+    // 记录删除的音频索引
+    // 需要调整索引，因为删除操作会影响后续索引
+    final adjustedIndex = _removedAudioIndices.where((i) => i < index).length;
+    _removedAudioIndices.add(index - adjustedIndex);
+
+    _updateChangeStatus();
   }
 
   Future<void> _playAudio(int index) async {
@@ -559,102 +559,205 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
   }
 
   Future<bool> _saveDiary({bool autoReturn = true}) async {
-    setState(() => _isLoading = true);
+    // 显示保存动画
+    setState(() {
+      _showSavingOverlay = true;
+      _saveProgress = 0.0;
+      _saveMessage = '正在准备保存...';
+    });
 
     try {
-      final diaryService = ref.read(diaryServiceProvider);
+      // 更新保存进度
+      setState(() {
+        _saveProgress = 0.1;
+        _saveMessage = '正在处理音频文件...';
+      });
 
-      // 获取现有的日记数据
-      final existingDiary = await diaryService.getTodayDiary();
-
-      // 创建AudioFile对象列表（使用新的保存方式）
+      // 创建AudioFile对象列表
       final List<AudioFile> audioFiles = [];
-
-      // 处理音频文件：只保存新录制的音频，保留已存在的音频
       for (int i = 0; i < _audioPaths.length; i++) {
         final audioFile = File(_audioPaths[i]);
         if (await audioFile.exists()) {
-          // 检查是否是临时录音文件（新录制的）
-          if (_audioPaths[i].contains('/tmp/') ||
-              _audioPaths[i].contains('cache')) {
-            // 新录制的音频文件，需要保存
-            final savedAudioFile = await diaryService.saveAudioDirectly(
-              sourcePath: _audioPaths[i],
-              displayName: _audioNames[i],
-              duration: _audioDurations[i].inMilliseconds,
-              recordTime: _audioRecordTimes[i],
-            );
-            if (savedAudioFile != null) {
-              audioFiles.add(savedAudioFile);
-            }
-          } else {
-            // 已存在的音频文件，直接使用
-            final existingAudioFile = AudioFile.create(
-              displayName: _audioNames[i],
-              filePath: _audioPaths[i],
-              duration: _audioDurations[i].inMilliseconds,
-              recordTime: _audioRecordTimes[i],
-            );
-            audioFiles.add(existingAudioFile);
-          }
-        } else {
-          print('音频文件不存在: ${_audioPaths[i]}');
+          final existingAudioFile = AudioFile.create(
+            displayName: _audioNames[i],
+            filePath: _audioPaths[i],
+            duration: _audioDurations[i].inMilliseconds,
+            recordTime: _audioRecordTimes[i],
+          );
+          audioFiles.add(existingAudioFile);
         }
       }
 
-      // 如果有现有日记，只更新内容，不删除文件
-      if (existingDiary != null) {
-        // 更新现有日记，保留未删除的音频文件
-        final updatedDiary = existingDiary.copyWith(
-          content: _textController.text.trim(),
-          images: [], // 图片会通过saveTodayDiary重新处理
-          audioFiles: audioFiles,
-        );
+      setState(() {
+        _saveProgress = 0.3;
+        _saveMessage = '正在准备数据...';
+      });
 
-        // 保存更新的日记
-        await diaryService.saveTodayDiary(
-          content: updatedDiary.content,
-          imageDataList: _selectedImages,
-          audioFiles: updatedDiary.audioFiles,
-        );
-      } else {
-        // 创建新日记
-        await diaryService.saveTodayDiary(
-          content: _textController.text.trim(),
-          imageDataList: _selectedImages,
-          audioFiles: audioFiles,
-        );
+      // 获取现有的日记数据
+      final diaryService = ref.read(diaryServiceProvider);
+      final existingDiary = await diaryService.getTodayDiary();
+
+      setState(() {
+        _saveProgress = 0.5;
+        _saveMessage = '正在后台保存...';
+      });
+
+      // 获取今日ID
+      final today = DateTime.now();
+      final todayId =
+          '${today.year}${today.month.toString().padLeft(2, '0')}${today.day.toString().padLeft(2, '0')}';
+
+      // 创建增量保存数据
+      final incrementalSaveData = _createIncrementalSaveData(
+        todayId,
+        existingDiary != null,
+      );
+
+      // 检查是否有变化
+      if (!incrementalSaveData.hasChanges) {
+        setState(() {
+          _saveProgress = 1.0;
+          _saveMessage = '没有变化需要保存';
+        });
+
+        // 隐藏保存动画，显示成功动画
+        setState(() {
+          _showSavingOverlay = false;
+          _showSaveSuccessOverlay = true;
+        });
+
+        // 等待成功动画完成后处理
+        Future.delayed(const Duration(milliseconds: 2000), () {
+          if (mounted) {
+            setState(() {
+              _showSaveSuccessOverlay = false;
+            });
+
+            // 根据参数决定是否自动返回
+            if (autoReturn) {
+              Navigator.of(context).pop();
+            }
+          }
+        });
+
+        return true;
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('保存成功'), duration: Duration(seconds: 1)),
-        );
+      // 在后台isolate中执行增量保存
+      final result = await IncrementalSaveService.saveIncrementalInBackground(
+        incrementalSaveData,
+      );
 
-        // 保存成功后重置初始状态哈希值
-        _resetInitialStateHash();
+      if (result.success) {
+        setState(() {
+          _saveProgress = 0.8;
+          _saveMessage = '正在保存...';
+        });
+
+        // 将增量保存的结果与数据库集成
+        if (existingDiary != null) {
+          // 更新现有日记 - 应用增量变化
+          List<models.ImageInfo> updatedImages = List.from(
+            existingDiary.images,
+          );
+          List<AudioFile> updatedAudioFiles = List.from(
+            existingDiary.audioFiles,
+          );
+
+          // 应用新增图片
+          if (result.savedImages != null) {
+            updatedImages.addAll(result.savedImages!);
+          }
+
+          // 应用新增音频文件
+          if (result.savedAudioFiles != null) {
+            updatedAudioFiles.addAll(result.savedAudioFiles!);
+          }
+
+          // 应用音频名称变化
+          for (final entry in _updatedAudioNames.entries) {
+            if (entry.key < updatedAudioFiles.length) {
+              updatedAudioFiles[entry.key] = updatedAudioFiles[entry.key]
+                  .copyWith(displayName: entry.value);
+            }
+          }
+
+          final updatedDiary = existingDiary.copyWith(
+            content: _contentChange ?? existingDiary.content,
+            images: updatedImages.isNotEmpty ? updatedImages : null,
+            audioFiles: updatedAudioFiles.isNotEmpty ? updatedAudioFiles : null,
+          );
+
+          await diaryService.saveTodayDiary(
+            content: updatedDiary.content,
+            imageDataList: _selectedImages,
+            audioFiles: updatedDiary.audioFiles,
+          );
+        } else {
+          // 创建新日记
+          await diaryService.saveTodayDiary(
+            content: _textController.text.trim(),
+            imageDataList: _selectedImages,
+            audioFiles: result.savedAudioFiles ?? [],
+          );
+        }
+
+        setState(() {
+          _saveProgress = 1.0;
+          _saveMessage = '保存完成';
+        });
+
+        // 隐藏保存动画，显示成功动画
+        setState(() {
+          _showSavingOverlay = false;
+          _showSaveSuccessOverlay = true;
+        });
+
+        // 保存成功后重置初始状态
+        _resetInitialState();
 
         // 刷新今日日记数据
         ref.invalidate(todayDiaryProvider);
 
-        // 根据参数决定是否自动返回
-        if (autoReturn) {
-          Navigator.of(context).pop();
-        }
-      }
+        // 等待成功动画完成后处理
+        Future.delayed(const Duration(milliseconds: 2000), () {
+          if (mounted) {
+            setState(() {
+              _showSaveSuccessOverlay = false;
+            });
 
-      return true; // 保存成功
+            // 根据参数决定是否自动返回
+            if (autoReturn) {
+              Navigator.of(context).pop();
+            }
+          }
+        });
+
+        return true;
+      } else {
+        // 保存失败
+        setState(() {
+          _showSavingOverlay = false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('保存失败：${result.error}')));
+        }
+        return false;
+      }
     } catch (e) {
+      setState(() {
+        _showSavingOverlay = false;
+      });
+
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('保存失败：$e')));
       }
-      return false; // 保存失败
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      return false;
     }
   }
 
@@ -663,7 +766,7 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
     final padding = 48.0;
     final imageSize = (screenWidth - padding) / 3;
 
-    return Container(
+    return SizedBox(
       width: double.infinity,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -695,12 +798,12 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
               ..._selectedImages.asMap().entries.map((entry) {
                 final index = entry.key;
                 final imageBytes = entry.value;
-                return Container(
+                return SizedBox(
                   width: imageSize,
                   height: imageSize,
                   child: Stack(
                     children: [
-                      Container(
+                      SizedBox(
                         width: imageSize,
                         height: imageSize,
                         child: Image.memory(
@@ -719,7 +822,7 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
                             width: 24,
                             height: 24,
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.6),
+                              color: Colors.black.withValues(alpha: 0.6),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -773,7 +876,7 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
   }
 
   Widget _buildAudioSection() {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -816,6 +919,11 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
                     setState(() {
                       _audioNames[index] = newName;
                     });
+
+                    // 记录音频名称变化
+                    _updatedAudioNames[index] = newName;
+
+                    _updateChangeStatus();
                   },
                   onEditingStarted: () {
                     // 编辑开始
@@ -829,43 +937,223 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
           // 录音按钮放在录音文件列表下面
           if (_audioPaths.length < maxAudios) ...[
             const SizedBox(height: 16),
-            GestureDetector(
-              onTapDown: (_) => _startRecording(),
-              onTapUp: (_) => _stopRecording(),
-              onTapCancel: () => _stopRecording(),
-              child: Container(
-                width: double.infinity,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: _isRecording
-                      ? Colors.red.shade100
-                      : Colors.grey.shade100,
-                  border: Border.all(
-                    color: _isRecording
-                        ? Colors.red.shade300
-                        : Colors.grey.shade300,
-                    width: 1,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      _isRecording ? Icons.stop : Icons.mic,
-                      color: _isRecording ? Colors.red : Colors.grey.shade400,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _isRecording ? '松开停止录音' : '按住录音',
-                      style: TextStyle(
-                        color: _isRecording ? Colors.red : Colors.grey.shade400,
-                        fontSize: 16,
+            Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // 点击录音按钮（点击开始/停止）
+                  SizedBox(
+                    width: 100,
+                    height: 100,
+                    child: Center(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeInOut,
+                        width: _isClickMode ? 100 : 56,
+                        height: _isClickMode ? 100 : 56,
+                        child: GestureDetector(
+                          onTap: () {
+                            if (_isClickMode) {
+                              // 激活状态：执行点击录音逻辑
+                              if (_isRecording) {
+                                _stopRecording();
+                              } else {
+                                _startRecording();
+                              }
+                            } else {
+                              // 非激活状态：切换到点击模式
+                              setState(() {
+                                _isClickMode = true;
+                              });
+                            }
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: _isClickMode
+                                  ? (_isRecording
+                                        ? Colors.red.shade100
+                                        : Colors.blue.shade100)
+                                  : Colors.grey.shade100,
+                              border: Border.all(
+                                color: _isClickMode
+                                    ? (_isRecording
+                                          ? Colors.red.shade300
+                                          : Colors.blue.shade300)
+                                    : Colors.grey.shade200,
+                                width: 2,
+                              ),
+                              shape: BoxShape.circle,
+                              boxShadow: _isClickMode
+                                  ? (_isRecording
+                                        ? [
+                                            BoxShadow(
+                                              color: Colors.red.withValues(
+                                                alpha: 0.3,
+                                              ),
+                                              blurRadius: 8,
+                                              spreadRadius: 2,
+                                            ),
+                                          ]
+                                        : [
+                                            BoxShadow(
+                                              color: Colors.blue.withValues(
+                                                alpha: 0.2,
+                                              ),
+                                              blurRadius: 6,
+                                              spreadRadius: 1,
+                                            ),
+                                          ])
+                                  : null,
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  (_isClickMode && _isRecording)
+                                      ? Icons.stop
+                                      : Icons.radio_button_checked,
+                                  color: _isClickMode
+                                      ? (_isRecording
+                                            ? Colors.red
+                                            : Colors.blue.shade600)
+                                      : Colors.grey.shade400,
+                                  size: _isClickMode ? 36 : 20,
+                                ),
+                                if (_isClickMode) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    (_isClickMode && _isRecording)
+                                        ? '停止录音'
+                                        : '点击录音',
+                                    style: TextStyle(
+                                      color: _isRecording
+                                          ? Colors.red
+                                          : Colors.blue.shade600,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 20),
+                  // 长按录音按钮（按住录音，松开停止）
+                  SizedBox(
+                    width: 100,
+                    height: 100,
+                    child: Center(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeInOut,
+                        width: !_isClickMode ? 100 : 56,
+                        height: !_isClickMode ? 100 : 56,
+                        child: GestureDetector(
+                          onTap: () {
+                            if (_isClickMode) {
+                              // 非激活状态：切换到长按模式
+                              setState(() {
+                                _isClickMode = false;
+                              });
+                            }
+                          },
+                          onTapDown: (_) {
+                            if (!_isClickMode) {
+                              // 激活状态：执行长按录音逻辑
+                              _startRecording();
+                            }
+                          },
+                          onTapUp: (_) {
+                            if (!_isClickMode) {
+                              // 激活状态：停止录音
+                              _stopRecording();
+                            }
+                          },
+                          onTapCancel: () {
+                            if (!_isClickMode) {
+                              // 激活状态：停止录音
+                              _stopRecording();
+                            }
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: !_isClickMode
+                                  ? (_isRecording
+                                        ? Colors.red.shade100
+                                        : Colors.blue.shade100)
+                                  : Colors.grey.shade100,
+                              border: Border.all(
+                                color: !_isClickMode
+                                    ? (_isRecording
+                                          ? Colors.red.shade300
+                                          : Colors.blue.shade300)
+                                    : Colors.grey.shade200,
+                                width: 2,
+                              ),
+                              shape: BoxShape.circle,
+                              boxShadow: !_isClickMode
+                                  ? (_isRecording
+                                        ? [
+                                            BoxShadow(
+                                              color: Colors.red.withValues(
+                                                alpha: 0.3,
+                                              ),
+                                              blurRadius: 8,
+                                              spreadRadius: 2,
+                                            ),
+                                          ]
+                                        : [
+                                            BoxShadow(
+                                              color: Colors.blue.withValues(
+                                                alpha: 0.2,
+                                              ),
+                                              blurRadius: 6,
+                                              spreadRadius: 1,
+                                            ),
+                                          ])
+                                  : null,
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  (!_isClickMode && _isRecording)
+                                      ? Icons.stop
+                                      : Icons.mic,
+                                  color: !_isClickMode
+                                      ? (_isRecording
+                                            ? Colors.red
+                                            : Colors.blue.shade600)
+                                      : Colors.grey.shade400,
+                                  size: !_isClickMode ? 36 : 20,
+                                ),
+                                if (!_isClickMode) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    (!_isClickMode && _isRecording)
+                                        ? '松开停止'
+                                        : '按住录音',
+                                    style: TextStyle(
+                                      color: _isRecording
+                                          ? Colors.red
+                                          : Colors.blue.shade600,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -881,50 +1169,57 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          '今日记录',
-          style: TextStyle(
-            color: Colors.black87,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        title: _isRecording
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.mic, color: Colors.red, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    _formatRecordingDuration(
+                      maxRecordingDuration - _currentRecordingDuration,
+                    ),
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              )
+            : const Text(
+                '今日记录',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
           onPressed: _handleBackPress,
         ),
         actions: [
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.black87),
-                ),
-              ),
-            )
-          else
-            TextButton(
-              onPressed: _saveDiary,
-              child: const Text(
-                '保存',
-                style: TextStyle(
-                  color: Colors.black87,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+          TextButton(
+            onPressed: _showSavingOverlay ? null : _saveDiary,
+            child: Text(
+              '保存',
+              style: TextStyle(
+                color: _showSavingOverlay ? Colors.grey : Colors.black87,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
+          ),
         ],
       ),
-      body: WillPopScope(
-        onWillPop: () async {
+      body: PopScope(
+        canPop: !_showSavingOverlay, // 如果正在保存，不允许返回
+        onPopInvoked: (didPop) async {
+          if (didPop) return; // 如果已经弹出，不需要处理
+
           await _handleBackPress();
-          return false; // 我们已经在_handleBackPress中处理了导航
         },
         child: Stack(
           children: [
@@ -1000,16 +1295,18 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
                 ],
               ),
             ),
-            // 录音指示器覆盖层
-            if (_showRecordingIndicator)
-              Positioned(
-                right: 0,
-                left: 0,
-                top: MediaQuery.of(context).size.height * 0.1,
-                child: Container(
-                  color: Colors.black.withOpacity(0.7),
-                  child: Center(child: _buildRecordingIndicator()),
-                ),
+
+            // 保存动画覆盖层
+            if (_showSavingOverlay)
+              SavingOverlay(message: _saveMessage, progress: _saveProgress),
+            // 保存成功动画覆盖层
+            if (_showSaveSuccessOverlay)
+              SaveSuccessOverlay(
+                onAnimationComplete: () {
+                  setState(() {
+                    _showSaveSuccessOverlay = false;
+                  });
+                },
               ),
           ],
         ),
@@ -1017,45 +1314,131 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
     );
   }
 
-  /// 生成当前状态的MD5哈希值
-  String _generateStateHash() {
-    // 创建包含所有状态信息的Map
-    final stateData = {
-      'content': _textController.text,
-      'images': _selectedImages.map((img) => base64Encode(img)).toList(),
-      'audioPaths': _audioPaths,
-      'audioNames': _audioNames,
-      'audioDurations': _audioDurations.map((d) => d.inMilliseconds).toList(),
-      'audioRecordTimes': _audioRecordTimes
-          .map((t) => t.toIso8601String())
-          .toList(),
-    };
+  /// 设置初始状态
+  void _setInitialState() {
+    _initialContent = _textController.text;
+    _initialImages = List.from(_selectedImages);
+    _initialAudioPaths = List.from(_audioPaths);
+    _initialAudioNames = List.from(_audioNames);
+    _hasUnsavedChanges = false;
 
-    // 将Map转换为JSON字符串
-    final jsonString = jsonEncode(stateData);
-
-    // 生成MD5哈希值
-    final bytes = utf8.encode(jsonString);
-    final digest = md5.convert(bytes);
-
-    return digest.toString();
+    // 重置增量保存变量
+    _contentChange = null;
+    _newImages.clear();
+    _removedImageIndices.clear();
+    _newAudioFiles.clear();
+    _removedAudioIndices.clear();
+    _updatedAudioNames.clear();
   }
 
   /// 检查是否有未保存的修改
   bool _hasChanges() {
-    if (_initialStateHash == null) {
-      print('初始状态哈希值为空，返回false');
-      return false;
-    }
-    final currentHash = _generateStateHash();
-    final hasChanges = _initialStateHash != currentHash;
+    // 检查文本内容是否有变化
+    final contentChanged = _textController.text != _initialContent;
+
+    // 检查图片是否有变化
+    final imagesChanged =
+        _selectedImages.length != _initialImages.length ||
+        !_areImagesEqual(_selectedImages, _initialImages);
+
+    // 检查音频路径是否有变化
+    final audioPathsChanged =
+        _audioPaths.length != _initialAudioPaths.length ||
+        !_areListsEqual(_audioPaths, _initialAudioPaths);
+
+    // 检查音频名称是否有变化
+    final audioNamesChanged =
+        _audioNames.length != _initialAudioNames.length ||
+        !_areListsEqual(_audioNames, _initialAudioNames);
+
+    final hasChanges =
+        contentChanged ||
+        imagesChanged ||
+        audioPathsChanged ||
+        audioNamesChanged;
 
     // 调试信息
-    print('初始状态哈希值: $_initialStateHash');
-    print('当前状态哈希值: $currentHash');
-    print('是否有修改: $hasChanges');
+    assert(() {
+      print('内容变化: $contentChanged');
+      print('图片变化: $imagesChanged');
+      print('音频路径变化: $audioPathsChanged');
+      print('音频名称变化: $audioNamesChanged');
+      print('是否有修改: $hasChanges');
+      return true;
+    }());
 
     return hasChanges;
+  }
+
+  /// 比较两个图片列表是否相等
+  bool _areImagesEqual(List<Uint8List> list1, List<Uint8List> list2) {
+    if (list1.length != list2.length) return false;
+    for (int i = 0; i < list1.length; i++) {
+      if (list1[i].length != list2[i].length) return false;
+      // 简单比较长度，如果需要更精确的比较可以比较内容
+    }
+    return true;
+  }
+
+  /// 比较两个字符串列表是否相等
+  bool _areListsEqual(List<String> list1, List<String> list2) {
+    if (list1.length != list2.length) return false;
+    for (int i = 0; i < list1.length; i++) {
+      if (list1[i] != list2[i]) return false;
+    }
+    return true;
+  }
+
+  /// 文本变化监听器
+  void _onTextChanged() {
+    if (_initialContent.isNotEmpty || _textController.text.isNotEmpty) {
+      // 记录文本内容变化
+      if (_textController.text != _initialContent) {
+        _contentChange = _textController.text;
+      } else {
+        _contentChange = null;
+      }
+
+      final hasChanges = _hasChanges();
+      if (hasChanges != _hasUnsavedChanges) {
+        setState(() {
+          _hasUnsavedChanges = hasChanges;
+        });
+      }
+    }
+  }
+
+  /// 更新修改状态
+  void _updateChangeStatus() {
+    final hasChanges = _hasChanges();
+    if (hasChanges != _hasUnsavedChanges) {
+      setState(() {
+        _hasUnsavedChanges = hasChanges;
+      });
+    }
+  }
+
+  /// 创建增量保存数据
+  IncrementalSaveData _createIncrementalSaveData(
+    String todayId,
+    bool isUpdate,
+  ) {
+    return IncrementalSaveData(
+      newContent: _contentChange,
+      newImages: _newImages.isNotEmpty ? _newImages : null,
+      removedImageIndices: _removedImageIndices.isNotEmpty
+          ? _removedImageIndices
+          : null,
+      newAudioFiles: _newAudioFiles.isNotEmpty ? _newAudioFiles : null,
+      removedAudioIndices: _removedAudioIndices.isNotEmpty
+          ? _removedAudioIndices
+          : null,
+      updatedAudioNames: _updatedAudioNames.isNotEmpty
+          ? _updatedAudioNames
+          : null,
+      todayId: todayId,
+      isUpdate: isUpdate,
+    );
   }
 
   /// 显示保存确认对话框
@@ -1118,14 +1501,22 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
         false;
   }
 
-  /// 重置初始状态哈希值（在保存成功后调用）
-  void _resetInitialStateHash() {
-    _initialStateHash = _generateStateHash();
-    print('重置初始状态哈希值: $_initialStateHash');
+  /// 重置初始状态（在保存成功后调用）
+  void _resetInitialState() {
+    _setInitialState();
+    assert(() {
+      print('重置初始状态完成');
+      return true;
+    }());
   }
 
   /// 处理返回按钮点击
   Future<void> _handleBackPress() async {
+    // 如果正在保存，不允许返回
+    if (_showSavingOverlay) {
+      return;
+    }
+
     if (_hasChanges()) {
       final shouldSave = await _showSaveConfirmDialog();
       if (shouldSave) {
@@ -1149,7 +1540,7 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
 
   String _getFormattedDate() {
     final now = DateTime.now();
-    final weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    final weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周天'];
     final weekday = weekdays[now.weekday - 1];
     return '${now.year}年${now.month}月${now.day}日 $weekday';
   }
@@ -1365,7 +1756,7 @@ class _AudioListItemState extends State<_AudioListItem> {
               width: 24,
               height: 24,
               decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.5),
+                color: Colors.grey.withValues(alpha: 0.5),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.close, color: Colors.white, size: 16),
