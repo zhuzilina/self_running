@@ -1,177 +1,187 @@
-# Self Running —— 和过去的自己赛跑（Flutter）
+# 与自己赛跑 - 尝试记录每一天
 
-一个专注“只和过去的自己比”的步数 App。连接手机健康平台（Apple Health / Google Fit），按“日”聚合你的步数数据，计算“今天超过了过去多少天”，并用折线图与日历热力图直观展示趋势与坚持。
+## 一、应用简介
 
----
+本应用致力于帮助用户记录每天的美好瞬间，包括文字、图像、声音等内容。通过记录用户的日常趣事和步数数据，本应用可以：
 
-## 功能特性
+- **整理并生成可阅读、可搜索的记忆卡片**，帮助用户回顾和保存重要回忆；
+- **通过步数排行榜**，帮助用户与过去的自己"相遇"，体验时光的流动与变化。
 
-- 今日步数总览与“超过过去 X 天/约 Y%”提示
-- 自我排行：按步数对历史天数降序排序，突出“今天”；支持 7/30/90/365 天筛选
-- 统计可视化：最近 30 天折线图；全年热力图
-- 本地持久化：使用 Hive 将按日聚合后的数据保存在本地
-- 轻权限：仅申请读取步数所需的最小权限
-- Android-only 兜底：在 Health 数据不可用时，使用系统传感器（TYPE_STEP_COUNTER）计算“今日步数”（需 ACTIVITY_RECOGNITION 权限）
+## 二、主要功能
 
----
+### 主页
+- 展示用户个人信息和今日步数统计
+- 提供下拉刷新功能，实时更新步数数据
+- 支持动态封面图片缩放效果
+- 显示今日日记编辑卡片，支持快速记录
+- 集成运动健康权限管理
 
-## 演示预览（占位）
+### 日记编辑页
+- 支持文字、图片、音频等多种内容记录
+- 提供点击和长按两种录音模式
+- 支持图片多选上传（最多9张）
+- 音频文件管理，包括播放、重命名、删除
+- 增量保存机制，提升保存效率
+- 智能检测未保存修改，提供保存确认
 
-- 主页：今日步数与相对名次
-- 排行页：近 7/30/90/365 天排序
-- 统计页：折线图 + 热力图
+### 排行榜页
+- 展示用户历史步数排行榜
+- 按步数高低排序显示
+- 显示用户头像、昵称、签名等信息
+- 支持今日数据与历史数据对比
+- 提供数据可视化展示
 
-可在真机运行查看实际效果。
+### 足迹页
+- 按时间分组展示所有日记记录
+- 支持关键词搜索功能
+- 置顶日记特殊展示
+- 懒加载图片优化性能
+- 音频播放器集成
+- 支持日记详情查看
 
----
+### 日记详情页
+- 完整展示单篇日记内容
+- 支持图片轮播查看
+- 音频文件播放控制
+- 日记置顶/取消置顶功能
+- 垂直滑动切换相邻日记
+- 图片全屏预览功能
 
-## 快速开始
+## 三、项目结构
 
-1) 环境准备
-
-- Flutter SDK（稳定版）
-- Dart >= 3.8.1（见 `pubspec.yaml` 中 `environment.sdk`）
-- Android Studio / Xcode（用于构建与真机调试）
-- 建议使用真机（健康数据在模拟器上通常不可用）
-
-2) 克隆与依赖
-
-```bash
-flutter pub get
+```
+self_running/
+├── android/                 # Android平台配置
+├── ios/                    # iOS平台配置
+├── lib/
+│   ├── data/              # 数据层
+│   │   ├── models/        # 数据模型
+│   │   └── repositories/  # 数据仓库
+│   ├── domain/            # 领域层
+│   │   └── usecases/      # 用例
+│   ├── presentation/      # 表现层
+│   │   ├── pages/         # 页面组件
+│   │   ├── states/        # 状态管理
+│   │   └── widgets/       # 通用组件
+│   ├── services/          # 服务层
+│   └── platform/          # 平台特定代码
+├── assets/                # 静态资源
+├── test/                  # 测试文件
+└── web/                   # Web平台配置
 ```
 
-3) 运行
+## 四、技术栈
 
-```bash
-flutter run
-```
+### 前端框架
+- **Flutter** - 跨平台UI框架
+- **Dart** - 编程语言
 
----
+### 状态管理
+- **Riverpod** - 状态管理解决方案
 
-## 平台配置
+### 数据存储
+- **SQLite** - 本地数据库
+- **SharedPreferences** - 轻量级数据存储
 
-### iOS（Apple HealthKit）
+### 多媒体处理
+- **image_picker** - 图片选择
+- **record** - 音频录制
+- **audioplayers** - 音频播放
+- **photo_view** - 图片预览
 
-- 在 Xcode 中为 `Runner` 开启 HealthKit Capability
-- 在 `ios/Runner/Info.plist` 中添加用途描述键：
-  - `NSHealthShareUsageDescription`：说明读取步数的目的
-  - `NSMotionUsageDescription`：说明与运动与健身相关能力使用的目的
-- 首次运行会弹出授权对话框，请允许“读取步数”
+### 健康数据
+- **health** - 健康数据访问
+- **sensors_plus** - 传感器数据
 
-### Android（Google Fit / 传感器）
+### 其他依赖
+- **intl** - 国际化
+- **path_provider** - 路径管理
+- **percent_indicator** - 进度指示器
+- **flutter_sticky_header** - 粘性头部
 
-- Android 10+ 设备需声明并请求“身体活动识别”权限：`android.permission.ACTIVITY_RECOGNITION`
-- 如使用 Google Fit 数据源，需完成对应 OAuth 配置（具体以 `health` 插件文档为准）
-- 首次运行会弹出授权对话框，请允许“读取步数”
-- 已内置传感器兜底：设备支持 `TYPE_STEP_COUNTER` 时，可在未安装 Google Fit/Health Connect 的情况下计算“今日步数”（仅限当日，且重启后会重置基线）
+## 五、平台支持
 
-注意：桌面与 Web 平台通常无法访问健康数据，应用会正常启动但数据列表为空。
+- ✅ **Android** - 支持Android 5.0及以上版本
+- ✅ **iOS** - 支持iOS 11.0及以上版本
+- ✅ **Web** - 支持现代浏览器
+- ✅ **Windows** - 支持Windows 10及以上版本
+- ✅ **macOS** - 支持macOS 10.14及以上版本
+- ✅ **Linux** - 支持主流Linux发行版
 
----
+## 六、部署说明
 
-## 架构概览
+### 环境要求
+- Flutter SDK 3.0.0 或更高版本
+- Dart SDK 2.17.0 或更高版本
+- Android Studio / VS Code
+- Xcode (仅iOS开发需要)
 
-分层设计，清晰可维护：
+### 安装步骤
 
-- data：平台数据源与模型（`health` 插件 → `HealthRepository` → `DailySteps`）
-- domain：用例（`FetchDailyStepsUseCase`、`computeRanking`）
-- presentation：页面与状态（Riverpod Providers，`HomePage` / `RankingPage` / `StatsPage`）
-- services：本地存储（`StorageService` 基于 Hive）
+1. **克隆项目**
+   ```bash
+   git clone https://github.com/zhuzilina/self_running.git
+   cd self_running
+   ```
 
-目录（节选）：
+2. **安装依赖**
+   ```bash
+   flutter pub get
+   ```
 
-```text
-lib/
-  data/
-    models/
-      daily_steps.dart
-    repositories/
-      health_repository.dart
-  domain/
-    usecases/
-      compute_ranking_usecase.dart
-      fetch_daily_steps_usecase.dart
-  presentation/
-    pages/
-      home_page.dart
-      ranking_page.dart
-      stats_page.dart
-    states/
-      providers.dart
-  services/
-    storage_service.dart
-  app.dart
-  main.dart
-```
+3. **运行项目**
+   ```bash
+   # 调试模式
+   flutter run
+   
+   # 发布模式
+   flutter run --release
+   ```
 
----
+4. **构建应用**
+   ```bash
+   # Android APK
+   flutter build apk
+   
+   # iOS
+   flutter build ios
+   
+   # Web
+   flutter build web
+   ```
 
-## 核心数据模型
+### 配置说明
 
-```dart
-class DailySteps {
-  final DateTime localDay;
-  final int steps;
-  final int? goal;
-  final int tzOffsetMinutes;
+- **Android**: 确保在 `android/app/build.gradle` 中配置正确的包名和版本信息
+- **iOS**: 在 `ios/Runner/Info.plist` 中配置必要的权限描述
+- **健康权限**: 应用需要运动健康权限来获取步数数据
 
-  const DailySteps({
-    required this.localDay,
-    required this.steps,
-    required this.tzOffsetMinutes,
-    this.goal,
-  });
-}
-```
+## 七、开源协议
 
-原则：以“本地自然日”为最小聚合单位；持久化时记录 `tzOffsetMinutes`，便于时区切换与旅行场景回放。
+本项目采用 **Apache License 2.0** 开源协议。
 
----
+### 协议要点
 
-## 关键用例与状态
+- **使用自由**: 您可以自由使用、修改和分发本软件
+- **商业友好**: 允许商业使用，无需支付费用
+- **专利授权**: 包含专利授权条款
+- **免责声明**: 软件按"原样"提供，不提供任何保证
 
-- `FetchDailyStepsUseCase`：
-  - 拉取健康平台步数 → 按“日”聚合 → 与本地缓存合并 → 对缺失日期补 0 → 按日排序 → 落盘 Hive
-- `computeRanking`：
-  - 将“今天”插入历史步数列表，按步数降序计算名次/百分位与“超过了多少天”
-- Riverpod Providers：
-  - `dailyStepsProvider`：触发同步并提供按日数据
-  - `todayRankingProvider`：基于 `dailyStepsProvider` 计算今天的名次、百分位与超过天数
+### 协议要求
 
----
+使用本软件时，您需要：
 
-## 主要依赖
+1. 保留原始版权声明
+2. 在修改的文件中说明您所做的更改
+3. 包含Apache License 2.0的完整副本
+4. 如果有NOTICE文件，需要保留其内容
 
-- `health`（健康数据接入）
-- `flutter_riverpod`（状态管理）
-- `fl_chart`（折线图）
-- `flutter_heatmap_calendar`（日历热力图）
-- `hive` / `hive_flutter`（本地持久化）
-- `intl`（日期格式化）
-
-具体版本见 `pubspec.yaml`。
+完整的协议文本请查看 [LICENSE](LICENSE) 文件。
 
 ---
 
-## 开发与调试提示
+**Copyright 2025 榆见晴天**
 
-- 真机优先：健康数据在模拟器上通常不可用
-- 首次进入 App 或下拉刷新会触发同步；Android 可按需扩展后台/定时同步
-- 若授权被拒绝，界面会提示“暂无数据”或“同步失败”，可在系统设置中重新授权
-- 可通过 `StorageService.clearAll()` 清空本地缓存进行验证
-
----
-
-## 已知限制与后续计划
-
-- 桌面与 Web 平台暂不支持健康数据（会显示空数据）
-- 未实现数据导出与小组件
-- 计划：CSV 导出、Android 后台 `workmanager`、个性化目标与成就系统
-
----
-
-## 许可证
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+如有问题或建议，欢迎提交Issue或Pull Request。
 
 

@@ -24,7 +24,7 @@ class HealthConnectService {
   HealthConnectService._internal();
 
   static const MethodChannel _channel = MethodChannel(
-    'com.example.self_running/health_connect',
+    'com.selfrunning/health_connect',
   );
 
   /// 检查Health Connect是否可用
@@ -82,11 +82,9 @@ class HealthConnectService {
       final DateTime localDay = DateTime.fromMillisecondsSinceEpoch(timestamp);
 
       assert(() {
-
         print('Today steps from Health Connect: $steps');
 
         return true;
-
       }());
 
       return DailySteps(
@@ -136,11 +134,9 @@ class HealthConnectService {
       stepsList.sort((a, b) => a.localDay.compareTo(b.localDay));
 
       assert(() {
-
         print('Steps data from Health Connect: ${stepsList.length} days');
 
         return true;
-
       }());
       return stepsList;
     } catch (e) {
@@ -236,11 +232,9 @@ class HealthConnectService {
       };
 
       assert(() {
-
         print('Health Connect permissions status: $result');
 
         return true;
-
       }());
       return result;
     } catch (e) {

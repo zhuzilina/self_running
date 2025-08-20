@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.self_running"
+    namespace = "com.selfrunning"
     compileSdk = 35
     // Force the highest required NDK version to satisfy plugins (device_info_plus/health/path_provider_android)
     ndkVersion = "27.0.12077973"
@@ -23,7 +23,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.self_running"
+        applicationId = "com.selfrunning"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 26

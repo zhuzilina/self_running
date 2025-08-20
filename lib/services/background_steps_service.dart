@@ -46,11 +46,9 @@ void callbackDispatcher() {
       }
 
       assert(() {
-
         print('Background task completed: $task');
 
         return true;
-
       }());
       return Future.value(true);
     } catch (e) {
@@ -76,7 +74,7 @@ Future<void> _handleDailyStepsBaseTask() async {
     await storage.init();
     await baseService.init();
 
-    const channel = MethodChannel('com.example.self_running/sensor');
+    const channel = MethodChannel('com.selfrunning/sensor');
     final stepCount = await channel.invokeMethod<int>('getCumulativeStepCount');
 
     if (stepCount != null) {
@@ -163,7 +161,7 @@ Future<void> _handleUpdateStepsBaseTask() async {
     await storage.init();
     await baseService.init();
 
-    const channel = MethodChannel('com.example.self_running/sensor');
+    const channel = MethodChannel('com.selfrunning/sensor');
     final stepCount = await channel.invokeMethod<int>('getCumulativeStepCount');
 
     if (stepCount != null) {
@@ -212,13 +210,11 @@ int _calculateBaseStepCount(DailyStepsBase latestBase, int currentStepCount) {
   final daysDifference = today.difference(latestDate).inDays;
 
   assert(() {
-
     print(
-    'Background - Days difference: $daysDifference, Latest base: ${latestBase.actualStepCount}, Current: $currentStepCount',
-  );
+      'Background - Days difference: $daysDifference, Latest base: ${latestBase.actualStepCount}, Current: $currentStepCount',
+    );
 
     return true;
-
   }());
 
   if (daysDifference == 1) {
@@ -226,8 +222,8 @@ int _calculateBaseStepCount(DailyStepsBase latestBase, int currentStepCount) {
     final newBase = latestBase.actualStepCount + latestBase.todaySteps;
     assert(() {
       print(
-      'Background - Next day base calculation: ${latestBase.actualStepCount} + ${latestBase.todaySteps} = $newBase',
-    );
+        'Background - Next day base calculation: ${latestBase.actualStepCount} + ${latestBase.todaySteps} = $newBase',
+      );
       return true;
     }());
 
@@ -346,11 +342,9 @@ class BackgroundStepsService {
       );
 
       assert(() {
-
         print('Background tasks registered successfully');
 
         return true;
-
       }());
     } catch (e) {
       assert(() {

@@ -26,9 +26,7 @@ class RealtimeStepsService {
   factory RealtimeStepsService() => _instance;
   RealtimeStepsService._internal();
 
-  static const MethodChannel _channel = MethodChannel(
-    'com.example.self_running/sensor',
-  );
+  static const MethodChannel _channel = MethodChannel('com.selfrunning/sensor');
   final StorageService _storage = StorageService();
   final DailyStepsBaseService _baseService = DailyStepsBaseService();
 

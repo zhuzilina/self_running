@@ -25,9 +25,7 @@ class SensorStepsService {
   factory SensorStepsService() => _instance;
   SensorStepsService._internal();
 
-  static const MethodChannel _channel = MethodChannel(
-    'com.example.self_running/sensor',
-  );
+  static const MethodChannel _channel = MethodChannel('com.selfrunning/sensor');
   final StorageService _storage = StorageService();
   final DailyStepsBaseService _baseService = DailyStepsBaseService();
 
