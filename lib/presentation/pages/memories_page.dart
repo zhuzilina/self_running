@@ -13,14 +13,242 @@ import 'package:percent_indicator/percent_indicator.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'diary_detail_page.dart';
 
-class StatsPage extends ConsumerStatefulWidget {
-  const StatsPage({super.key});
+// 优化的懒加载图片组件
+class OptimizedLazyImageWidget extends StatefulWidget {
+  final String imagePath;
+  final double width;
+  final double height;
+  final BoxFit fit;
+  final Widget? placeholder;
+  final Widget? errorWidget;
+
+  const OptimizedLazyImageWidget({
+    super.key,
+    required this.imagePath,
+    required this.width,
+    required this.height,
+    this.fit = BoxFit.cover,
+    this.placeholder,
+    this.errorWidget,
+  });
 
   @override
-  ConsumerState<StatsPage> createState() => _StatsPageState();
+  State<OptimizedLazyImageWidget> createState() =>
+      _OptimizedLazyImageWidgetState();
 }
 
-class _StatsPageState extends ConsumerState<StatsPage> {
+class _OptimizedLazyImageWidgetState extends State<OptimizedLazyImageWidget> {
+  bool _isLoaded = false;
+  bool _hasError = false;
+  File? _imageFile;
+  Timer? _loadTimer;
+  static final Map<String, bool> _fileExistsCache = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // 延迟加载图片，避免一次性加载所有图片
+    _loadTimer = Timer(const Duration(milliseconds: 50), () {
+      _checkImageExists();
+    });
+  }
+
+  @override
+  void dispose() {
+    _loadTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkImageExists() async {
+    if (!mounted) return;
+
+    // 检查缓存
+    if (_fileExistsCache.containsKey(widget.imagePath)) {
+      if (_fileExistsCache[widget.imagePath] == true) {
+        if (mounted) {
+          setState(() {
+            _imageFile = File(widget.imagePath);
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _hasError = true;
+          });
+        }
+      }
+      return;
+    }
+
+    try {
+      final file = File(widget.imagePath);
+      final exists = await file.exists();
+
+      // 缓存结果
+      _fileExistsCache[widget.imagePath] = exists;
+
+      if (exists) {
+        if (mounted) {
+          setState(() {
+            _imageFile = file;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _hasError = true;
+          });
+        }
+      }
+    } catch (e) {
+      // 缓存错误结果
+      _fileExistsCache[widget.imagePath] = false;
+
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasError) {
+      return widget.errorWidget ??
+          Container(
+            color: Colors.grey[200],
+            child: const Icon(Icons.image, color: Colors.grey),
+          );
+    }
+
+    if (_imageFile == null) {
+      return widget.placeholder ??
+          Container(
+            color: Colors.grey[200],
+            child: const Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                ),
+              ),
+            ),
+          );
+    }
+
+    return Image.file(
+      _imageFile!,
+      width: widget.width,
+      height: widget.height,
+      fit: widget.fit,
+      cacheWidth: (widget.width * MediaQuery.of(context).devicePixelRatio)
+          .round(),
+      cacheHeight: (widget.height * MediaQuery.of(context).devicePixelRatio)
+          .round(),
+      errorBuilder: (context, error, stackTrace) {
+        if (!_hasError) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                _hasError = true;
+              });
+            }
+          });
+        }
+        return widget.errorWidget ??
+            Container(
+              color: Colors.grey[200],
+              child: const Icon(Icons.image, color: Colors.grey),
+            );
+      },
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (frame != null && !_isLoaded) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                _isLoaded = true;
+              });
+            }
+          });
+        }
+        return child;
+      },
+    );
+  }
+}
+
+// 优化的图片网格组件
+class OptimizedImageGrid extends StatelessWidget {
+  final List<String> imagePaths;
+  final int crossAxisCount;
+  final double spacing;
+  final double childAspectRatio;
+
+  const OptimizedImageGrid({
+    super.key,
+    required this.imagePaths,
+    this.crossAxisCount = 3,
+    this.spacing = 2.0,
+    this.childAspectRatio = 1.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // 限制最多显示9张图片
+    final displayImages = imagePaths.take(9).toList();
+
+    if (displayImages.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final itemWidth =
+            (availableWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
+        final itemHeight = itemWidth / childAspectRatio;
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: spacing,
+            childAspectRatio: childAspectRatio,
+          ),
+          itemCount: displayImages.length,
+          itemBuilder: (context, index) {
+            // 使用 RepaintBoundary 优化重绘性能
+            return RepaintBoundary(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: OptimizedLazyImageWidget(
+                  imagePath: displayImages[index],
+                  width: itemWidth,
+                  height: itemHeight,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class MemoriesPage extends ConsumerStatefulWidget {
+  const MemoriesPage({super.key});
+
+  @override
+  ConsumerState<MemoriesPage> createState() => _MemoriesPageState();
+}
+
+class _MemoriesPageState extends ConsumerState<MemoriesPage> {
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -217,7 +445,8 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                                   context,
                                   diary,
                                   ref,
-                                  diaries,
+                                  pinnedDiaries, // 传递置顶日记列表
+                                  isFromPinned: true, // 标识来自置顶
                                 ),
                               );
                             }, childCount: pinnedDiaries.length),
@@ -255,7 +484,13 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                             horizontal: 16.0,
                             vertical: 8.0,
                           ),
-                          child: _buildDiaryCard(context, diary, ref, diaries),
+                          child: _buildDiaryCard(
+                            context,
+                            diary,
+                            ref,
+                            nonPinnedDiaries, // 传递普通日记列表
+                            isFromPinned: false, // 标识来自普通列表
+                          ),
                         );
                       }, childCount: diariesInMonth.length),
                     ),
@@ -273,8 +508,9 @@ class _StatsPageState extends ConsumerState<StatsPage> {
     BuildContext context,
     Diary diary,
     WidgetRef ref,
-    List<Diary> allDiaries,
-  ) {
+    List<Diary> allDiaries, {
+    bool isFromPinned = false, // 新增参数标识是否来自置顶列表
+  }) {
     final dateFormat = DateFormat('yyyy年MM月dd日');
     final timeFormat = DateFormat('HH:mm');
 
@@ -295,7 +531,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
         case 6:
           return '周六';
         case 7:
-          return '周日';
+          return '周天';
         default:
           return '未知';
       }
@@ -307,8 +543,12 @@ class _StatsPageState extends ConsumerState<StatsPage> {
           MaterialPageRoute(
             builder: (context) => DiaryDetailPage(
               diary: diary,
-              allDiaries: allDiaries,
+              allDiaries: isFromPinned ? null : allDiaries, // 普通日记传递allDiaries
+              pinnedDiaries: isFromPinned
+                  ? allDiaries
+                  : null, // 置顶日记传递pinnedDiaries
               initialIndex: allDiaries.indexOf(diary),
+              isFromPinned: isFromPinned, // 传递标识
             ),
           ),
         );
@@ -521,7 +761,7 @@ class _StatsPageState extends ConsumerState<StatsPage> {
                     ],
                     // 图片预览区域
                     if (diary.images.isNotEmpty) ...[
-                      _buildImageGrid(diary.thumbnailPaths),
+                      OptimizedImageGrid(imagePaths: diary.thumbnailPaths),
                     ],
                   ],
                 ),
@@ -568,58 +808,6 @@ class _StatsPageState extends ConsumerState<StatsPage> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildImageGrid(List<String> imagePaths) {
-    // 限制最多显示9张图片
-    final displayImages = imagePaths.take(9).toList();
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 2,
-        mainAxisSpacing: 2,
-        childAspectRatio: 1,
-      ),
-      itemCount: displayImages.length, // 只显示实际图片数量
-      itemBuilder: (context, index) {
-        return _buildImageWidget(displayImages[index]);
-      },
-    );
-  }
-
-  Widget _buildImageWidget(String imagePath) {
-    return Container(
-      color: Colors.grey[200],
-      child: FutureBuilder<File>(
-        future: Future.value(File(imagePath)),
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data!.existsSync()) {
-            return ClipRect(
-              child: Image.file(
-                snapshot.data!,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.image, color: Colors.grey),
-                  );
-                },
-              ),
-            );
-          } else {
-            return Container(
-              color: Colors.grey[200],
-              child: const Icon(Icons.image, color: Colors.grey),
-            );
-          }
-        },
       ),
     );
   }
@@ -732,7 +920,10 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
         _isInitialized = true;
       });
     } catch (e) {
-      print('❌ 音频播放器初始化失败: $e');
+      assert(() {
+        print('❌ 音频播放器初始化失败: $e');
+        return true;
+      }());
     }
   }
 
@@ -822,7 +1013,10 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
         });
       }
     } catch (e) {
-      print('❌ 播放控制失败: $e');
+      assert(() {
+        print('❌ 播放控制失败: $e');
+        return true;
+      }());
     }
   }
 

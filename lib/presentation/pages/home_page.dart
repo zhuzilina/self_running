@@ -6,7 +6,7 @@ import '../widgets/user_profile_card.dart';
 import '../widgets/cover_image_widget.dart';
 import '../widgets/diary_card.dart';
 import 'ranking_page.dart';
-import 'stats_page.dart';
+import 'memories_page.dart';
 import 'settings_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -37,7 +37,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final pages = [
       const _OverviewTab(),
       const RankingPage(),
-      const StatsPage(),
+      const MemoriesPage(),
     ];
     return Scaffold(
       extendBodyBehindAppBar: _index != 2, // 只有在第三屏时不延伸到AppBar后面

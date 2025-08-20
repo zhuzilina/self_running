@@ -1,9 +1,6 @@
 import 'dart:io';
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:percent_indicator/percent_indicator.dart';
@@ -14,9 +11,7 @@ import 'package:audioplayers/audioplayers.dart';
 import '../../data/models/diary.dart';
 import '../../data/models/audio_file.dart';
 import '../../data/models/user_daily_data.dart';
-import '../../data/models/user_profile.dart';
 import '../../presentation/states/providers.dart';
-import '../../services/pinned_diary_service.dart';
 
 /// 日记内容查看浮窗
 class DiaryContentDialog extends StatelessWidget {
@@ -175,13 +170,17 @@ class TruncatedText extends StatelessWidget {
 class DiaryDetailPage extends ConsumerStatefulWidget {
   final Diary diary;
   final List<Diary>? allDiaries;
+  final List<Diary>? pinnedDiaries; // 新增置顶日记参数
   final int initialIndex;
+  final bool isFromPinned; // 新增标识是否来自置顶列表
 
   const DiaryDetailPage({
     super.key,
     required this.diary,
     this.allDiaries,
+    this.pinnedDiaries, // 新增置顶日记参数
     this.initialIndex = 0,
+    this.isFromPinned = false, // 新增标识是否来自置顶列表
   });
 
   @override
@@ -197,23 +196,53 @@ class _DiaryDetailPageState extends ConsumerState<DiaryDetailPage> {
   void initState() {
     super.initState();
     // 添加调试信息
-    print('🚀 DiaryDetailPage 初始化:');
-    print('  - allDiaries 数量: ${widget.allDiaries?.length ?? 0}');
-    print('  - initialIndex: ${widget.initialIndex}');
+    assert(() {
+      print('🚀 DiaryDetailPage 初始化:');
+      print('  - isFromPinned: ${widget.isFromPinned}');
+      print('  - allDiaries 数量: ${widget.allDiaries?.length ?? 0}');
+      print('  - pinnedDiaries 数量: ${widget.pinnedDiaries?.length ?? 0}');
+      print('  - initialIndex: ${widget.initialIndex}');
+      return true;
+    }());
+
+    // 根据来源决定使用哪个数据源
+    List<Diary>? targetDiaries;
+    if (widget.isFromPinned) {
+      targetDiaries = widget.pinnedDiaries;
+      assert(() {
+        print('  - 使用置顶日记数据源');
+        return true;
+      }());
+    } else {
+      targetDiaries = widget.allDiaries;
+      assert(() {
+        print('  - 使用普通日记数据源');
+        return true;
+      }());
+    }
 
     // 安全检查初始索引
-    if (widget.allDiaries != null && widget.allDiaries!.isNotEmpty) {
+    if (targetDiaries != null && targetDiaries.isNotEmpty) {
       _currentDiaryIndex = widget.initialIndex.clamp(
         0,
-        widget.allDiaries!.length - 1,
+        targetDiaries.length - 1,
       );
-      print('  - 设置初始页面索引: $_currentDiaryIndex');
+      assert(() {
+        print('  - 设置初始页面索引: $_currentDiaryIndex');
+        return true;
+      }());
     } else {
       _currentDiaryIndex = 0;
-      print('  - 使用默认页面索引: $_currentDiaryIndex');
+      assert(() {
+        print('  - 使用默认页面索引: $_currentDiaryIndex');
+        return true;
+      }());
     }
     _pageController = PageController(initialPage: _currentDiaryIndex);
-    print('  ✅ 初始化完成');
+    assert(() {
+      print('  ✅ 初始化完成');
+      return true;
+    }());
   }
 
   @override
@@ -230,10 +259,41 @@ class _DiaryDetailPageState extends ConsumerState<DiaryDetailPage> {
     );
   }
 
+  // 将英文星期转换为中文格式
+  String _getChineseWeekday(DateTime date) {
+    final weekday = date.weekday;
+    switch (weekday) {
+      case 1:
+        return '周一';
+      case 2:
+        return '周二';
+      case 3:
+        return '周三';
+      case 4:
+        return '周四';
+      case 5:
+        return '周五';
+      case 6:
+        return '周六';
+      case 7:
+        return '周天';
+      default:
+        return '未知';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 如果没有allDiaries，显示单页
-    if (widget.allDiaries == null || widget.allDiaries!.isEmpty) {
+    // 根据来源决定使用哪个数据源
+    List<Diary>? targetDiaries;
+    if (widget.isFromPinned) {
+      targetDiaries = widget.pinnedDiaries;
+    } else {
+      targetDiaries = widget.allDiaries;
+    }
+
+    // 如果没有目标数据源，显示单页
+    if (targetDiaries == null || targetDiaries.isEmpty) {
       return Scaffold(
         appBar: _buildAppBar(),
         body: _buildDiaryContent(widget.diary),
@@ -246,19 +306,23 @@ class _DiaryDetailPageState extends ConsumerState<DiaryDetailPage> {
       body: PageView.builder(
         controller: _pageController,
         scrollDirection: Axis.vertical,
-        itemCount: widget.allDiaries!.length,
+        itemCount: targetDiaries!.length, // 这里已经检查过非空
         onPageChanged: (index) {
           setState(() {
             _currentDiaryIndex = index;
           });
-          print('📄 PageView 页面切换:');
-          print('  - 从页面: $_currentDiaryIndex');
-          print('  - 到页面: $index');
-          print('  - 总页面数: ${widget.allDiaries!.length}');
-          print('  ✅ 页面切换成功');
+          assert(() {
+            print('📄 PageView 页面切换:');
+            print('  - 从页面: $_currentDiaryIndex');
+            print('  - 到页面: $index');
+            print('  - 总页面数: ${targetDiaries!.length}'); // 这里已经检查过非空
+            print('  - 数据源: ${widget.isFromPinned ? "置顶日记" : "普通日记"}');
+            print('  ✅ 页面切换成功');
+            return true;
+          }());
         },
         itemBuilder: (context, index) {
-          final diary = widget.allDiaries![index];
+          final diary = targetDiaries![index]; // 这里已经检查过非空
           return _buildDiaryContent(diary);
         },
       ),
@@ -267,130 +331,108 @@ class _DiaryDetailPageState extends ConsumerState<DiaryDetailPage> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.white,
       elevation: 0,
+      surfaceTintColor: Colors.white,
+      scrolledUnderElevation: 0,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.black),
         onPressed: () => Navigator.of(context).pop(),
       ),
       title: Consumer(
         builder: (context, ref, child) {
-          final userProfileAsync = ref.watch(userProfileProvider);
+          // 获取当前显示的日记
+          List<Diary>? targetDiaries;
+          if (widget.isFromPinned) {
+            targetDiaries = widget.pinnedDiaries;
+          } else {
+            targetDiaries = widget.allDiaries;
+          }
+
+          final currentDiary = targetDiaries != null && targetDiaries.isNotEmpty
+              ? targetDiaries[_currentDiaryIndex]
+              : widget.diary;
+
           final userDataAsync = ref.watch(userDailyDataRankingProvider);
 
-          return userProfileAsync.when(
-            loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
-            data: (userProfile) => userDataAsync.when(
-              loading: () => Row(
-                children: [
-                  // 用户头像
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: Colors.grey[200],
-                    backgroundImage: userProfile.avatar != null
-                        ? AssetImage(userProfile.avatar!)
-                        : null,
-                    child: userProfile.avatar == null
-                        ? Text(
-                            userProfile.nickname.isNotEmpty
-                                ? userProfile.nickname[0]
-                                : '?',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey,
-                            ),
-                          )
-                        : null,
+          return userDataAsync.when(
+            loading: () => Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Colors.grey[200],
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
                   ),
-                  const SizedBox(width: 8),
-                  // 用户昵称
-                  Expanded(
-                    child: Text(
-                      userProfile.nickname,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    '加载中...',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
-              error: (_, __) => Row(
-                children: [
-                  // 用户头像
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: Colors.grey[200],
-                    backgroundImage: userProfile.avatar != null
-                        ? AssetImage(userProfile.avatar!)
-                        : null,
-                    child: userProfile.avatar == null
-                        ? Text(
-                            userProfile.nickname.isNotEmpty
-                                ? userProfile.nickname[0]
-                                : '?',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey,
-                            ),
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 8),
-                  // 用户昵称
-                  Expanded(
-                    child: Text(
-                      userProfile.nickname,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+            error: (_, __) => Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Colors.grey[200],
+                  child: const Icon(Icons.error, size: 16, color: Colors.grey),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    '加载失败',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
-              data: (userDataList) {
-                // 获取当前用户的步数数据
-                int currentSteps = 0;
-                if (userDataList.isNotEmpty) {
-                  currentSteps = userDataList.first.steps;
-                }
+                ),
+              ],
+            ),
+            data: (userDataList) {
+              // 查找与当前日记日期对应的用户数据
+              UserDailyData? userData;
+              try {
+                userData = userDataList.firstWhere(
+                  (data) =>
+                      data.date.year == currentDiary.date.year &&
+                      data.date.month == currentDiary.date.month &&
+                      data.date.day == currentDiary.date.day,
+                );
+              } catch (e) {
+                // 如果找不到对应日期的数据，使用第一条数据作为默认值
+                userData = userDataList.isNotEmpty ? userDataList.first : null;
+              }
 
+              if (userData == null) {
                 return Row(
                   children: [
-                    // 用户头像
                     CircleAvatar(
                       radius: 16,
                       backgroundColor: Colors.grey[200],
-                      backgroundImage: userProfile.avatar != null
-                          ? AssetImage(userProfile.avatar!)
-                          : null,
-                      child: userProfile.avatar == null
-                          ? Text(
-                              userProfile.nickname.isNotEmpty
-                                  ? userProfile.nickname[0]
-                                  : '?',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey,
-                              ),
-                            )
-                          : null,
+                      child: const Icon(
+                        Icons.person,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    // 用户昵称
-                    Expanded(
+                    const Expanded(
                       child: Text(
-                        userProfile.nickname,
-                        style: const TextStyle(
+                        '未知用户',
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.black,
@@ -398,20 +440,58 @@ class _DiaryDetailPageState extends ConsumerState<DiaryDetailPage> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // 步数显示
-                    Text(
-                      _formatSteps(currentSteps),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey[700],
-                      ),
-                    ),
                   ],
                 );
-              },
-            ),
+              }
+
+              return Row(
+                children: [
+                  // 用户头像
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: Colors.grey[200],
+                    backgroundImage: userData.avatarPath != null
+                        ? FileImage(File(userData.avatarPath!))
+                        : null,
+                    child: userData.avatarPath == null
+                        ? Text(
+                            userData.nickname.isNotEmpty
+                                ? userData.nickname[0]
+                                : '我',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 8),
+                  // 用户昵称
+                  Expanded(
+                    child: Text(
+                      userData.nickname.isNotEmpty ? userData.nickname : '我的日记',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // 步数显示
+                  Text(
+                    _formatSteps(userData.steps),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+              );
+            },
           );
         },
       ),
@@ -574,7 +654,7 @@ class _DiaryDetailPageState extends ConsumerState<DiaryDetailPage> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  DateFormat('EEEE').format(diary.date),
+                  _getChineseWeekday(diary.date),
                   style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
                 const Spacer(),
@@ -695,8 +775,11 @@ class _DiaryDetailPageState extends ConsumerState<DiaryDetailPage> {
                           height: double.infinity,
                           filterQuality: FilterQuality.high,
                           errorBuilder: (context, error, stackTrace) {
-                            print('图片加载错误: $error');
-                            print('图片路径: ${file.path}');
+                            assert(() {
+                              print('图片加载错误: $error');
+                              print('图片路径: ${file.path}');
+                              return true;
+                            }());
                             return Container(
                               color: Colors.grey[200],
                               child: Column(
@@ -890,8 +973,11 @@ class _ImagePreviewPageState extends State<ImagePreviewPage> {
                   });
                 },
                 errorBuilder: (context, error, stackTrace) {
-                  print('图片预览加载错误: $error');
-                  print('图片路径: ${widget.imagePaths[index]}');
+                  assert(() {
+                    print('图片预览加载错误: $error');
+                    print('图片路径: ${widget.imagePaths[index]}');
+                    return true;
+                  }());
                   return Container(
                     color: Colors.black,
                     child: const Center(

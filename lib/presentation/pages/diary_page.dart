@@ -765,6 +765,9 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final padding = 48.0;
     final imageSize = (screenWidth - padding) / 3;
+    final crossAxisCount = 3;
+    final itemCount =
+        _selectedImages.length + (_selectedImages.length < maxImages ? 1 : 0);
 
     return SizedBox(
       width: double.infinity,
@@ -791,54 +794,20 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
               ],
             ),
           ),
-          Wrap(
-            spacing: 0,
-            runSpacing: 0,
-            children: [
-              ..._selectedImages.asMap().entries.map((entry) {
-                final index = entry.key;
-                final imageBytes = entry.value;
-                return SizedBox(
-                  width: imageSize,
-                  height: imageSize,
-                  child: Stack(
-                    children: [
-                      SizedBox(
-                        width: imageSize,
-                        height: imageSize,
-                        child: Image.memory(
-                          imageBytes,
-                          fit: BoxFit.cover,
-                          width: imageSize,
-                          height: imageSize,
-                        ),
-                      ),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: GestureDetector(
-                          onTap: () => _removeImage(index),
-                          child: Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.close,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-              if (_selectedImages.length < maxImages)
-                GestureDetector(
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              childAspectRatio: 1.0,
+              crossAxisSpacing: 0,
+              mainAxisSpacing: 0,
+            ),
+            itemCount: itemCount,
+            itemBuilder: (context, index) {
+              // 如果是添加按钮
+              if (index == _selectedImages.length) {
+                return GestureDetector(
                   onTap: _pickImage,
                   child: Container(
                     width: imageSize,
@@ -867,8 +836,17 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
                       ],
                     ),
                   ),
-                ),
-            ],
+                );
+              }
+
+              // 图片项
+              return _LazyImageItem(
+                index: index,
+                imageBytes: _selectedImages[index],
+                imageSize: imageSize,
+                onRemove: () => _removeImage(index),
+              );
+            },
           ),
         ],
       ),
@@ -1543,6 +1521,134 @@ class _DiaryPageState extends ConsumerState<DiaryPage> {
     final weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周天'];
     final weekday = weekdays[now.weekday - 1];
     return '${now.year}年${now.month}月${now.day}日 $weekday';
+  }
+}
+
+/// 懒加载图片项组件
+class _LazyImageItem extends StatefulWidget {
+  final int index;
+  final Uint8List imageBytes;
+  final double imageSize;
+  final VoidCallback onRemove;
+
+  const _LazyImageItem({
+    required this.index,
+    required this.imageBytes,
+    required this.imageSize,
+    required this.onRemove,
+  });
+
+  @override
+  State<_LazyImageItem> createState() => _LazyImageItemState();
+}
+
+class _LazyImageItemState extends State<_LazyImageItem> {
+  bool _isVisible = false;
+  bool _isLoaded = false;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 延迟加载，避免一次性加载所有图片
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _isVisible = true;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.imageSize,
+      height: widget.imageSize,
+      child: Stack(
+        children: [
+          // 图片容器
+          SizedBox(
+            width: widget.imageSize,
+            height: widget.imageSize,
+            child: _isVisible
+                ? Image.memory(
+                    widget.imageBytes,
+                    fit: BoxFit.cover,
+                    width: widget.imageSize,
+                    height: widget.imageSize,
+                    frameBuilder:
+                        (context, child, frame, wasSynchronouslyLoaded) {
+                          if (frame != null) {
+                            _isLoaded = true;
+                          }
+                          return child;
+                        },
+                    errorBuilder: (context, error, stackTrace) {
+                      _hasError = true;
+                      return Container(
+                        width: widget.imageSize,
+                        height: widget.imageSize,
+                        color: Colors.grey.shade200,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.broken_image,
+                              color: Colors.grey.shade400,
+                              size: 32,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '加载失败',
+                              style: TextStyle(
+                                color: Colors.grey.shade400,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  )
+                : Container(
+                    width: widget.imageSize,
+                    height: widget.imageSize,
+                    color: Colors.grey.shade100,
+                    child: Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.grey.shade400,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
+          // 删除按钮
+          Positioned(
+            top: 4,
+            right: 4,
+            child: GestureDetector(
+              onTap: widget.onRemove,
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
